@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explicación Física Cámara</title>
+    <style>
+        body {
+            background: #181c24;
+            color: #f3f3f3;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            background: #23283a;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px #0008;
+            padding: 32px 40px;
+        }
+        h1, h2, h3 {
+            color: #ffb347;
+            margin-top: 1.5em;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.2em;
+            margin-bottom: 0.5em;
+        }
+        pre, code {
+            background: #11131a;
+            color: #aeefff;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 1em;
+            overflow-x: auto;
+        }
+        .section {
+            margin-bottom: 2.5em;
+        }
+        ul, ol {
+            margin-left: 2em;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+        }
+        th, td {
+            border: 1px solid #444;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        th {
+            background: #2d334d;
+            color: #ffb347;
+        }
+        tr:nth-child(even) {
+            background: #23283a;
+        }
+        tr:nth-child(odd) {
+            background: #1b1f2a;
+        }
+        .controls {
+            background: #11131a;
+            border-left: 4px solid #ffb347;
+            padding: 12px 18px;
+            margin: 1em 0;
+            border-radius: 6px;
+        }
+        .param-table {
+            margin-top: 1em;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Explicación del Código: <span style="color:#aeefff">fisica_camara.py</span></h1>
+    <div class="section">
+        <h2>¿Qué hace este programa?</h2>
+        <p>El programa abre la cámara, detecta los bordes de cualquier objeto físico que aparezca (cinta adhesiva, libro, regla, tu mano…) y lanza pelotas de colores que rebotan en esos bordes con física realista.<br>
+        Además, la mano detectada actúa como un objeto sólido: puedes golpear, empujar o arrastrar las pelotas directamente con tus dedos.</p>
+        <div class="controls">
+            <strong>Controles:</strong><br>
+            <ul>
+                <li><b>ESPACIO</b> → añadir una pelota</li>
+                <li><b>R</b> → reiniciar todas las pelotas</li>
+                <li><b>D</b> → activar/desactivar modo debug (muestra bordes en verde)</li>
+                <li><b>ESC</b> → salir</li>
+            </ul>
+        </div>
+    </div>
+    <div class="section">
+        <h2>1. Detección de Bordes (Canny)</h2>
+        <ol>
+            <li>Conversión a escala de grises.</li>
+            <li>Suavizado con filtro Gaussiano (5×5) para reducir el ruido.</li>
+            <li>Aplicación de Canny con umbrales <b>CANNY_LO=35</b> y <b>CANNY_HI=110</b>.</li>
+            <li>Dilatación del resultado para dar grosor físico a los bordes (<b>EDGE_DILATE=7 px</b>).</li>
+        </ol>
+        <p>La máscara resultante (<code>thick</code>) es una imagen binaria donde 0=vacío y 255=superficie sólida.</p>
+        <pre>gray  = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+blur  = cv2.GaussianBlur(gray, (5, 5), 0)
+edges = cv2.Canny(blur, CANNY_LO, CANNY_HI)
+thick = cv2.dilate(edges, kernel, iterations=1)</pre>
+        <p><b>¿Por qué se enmascara la mano antes de Canny?</b><br>
+        La mano tiene su propio sistema de colisión (segmentos de cápsula). Si Canny también detectara los bordes de la mano, habría dos sistemas de colisión en conflicto. La solución es borrar los bordes dentro del contorno convexo (<code>convexHull</code>) de la mano antes de dilatar:</p>
+        <pre>hull = cv2.convexHull(pts)
+cv2.fillConvexPoly(edges, hull, 0)   # borrar bordes de la mano</pre>
+    </div>
+    <div class="section">
+        <h2>2. Normales de Superficie (gradiente Sobel)</h2>
+        <p>Para que la pelota rebote en la dirección correcta se necesita saber la "normal" de la superficie en el punto de contacto (dirección perpendicular a la superficie). Se usa el operador Sobel:</p>
+        <pre>gx = cv2.Sobel(ft, cv2.CV_32F, 1, 0, ksize=5)
+gy = cv2.Sobel(ft, cv2.CV_32F, 0, 1, ksize=5)</pre>
+        <ul>
+            <li><b>gx</b>: componente horizontal de la normal</li>
+            <li><b>gy</b>: componente vertical de la normal</li>
+        </ul>
+    </div>
+    <div class="section">
+        <h2>3. Física de las Pelotas</h2>
+        <ul>
+            <li><b>Gravedad:</b> <code>vy += GRAVITY</code></li>
+            <li><b>Bordes de la ventana:</b> rebote y rozamiento</li>
+            <li><b>Colisión con la máscara de bordes:</b> reflexión física usando la normal</li>
+        </ul>
+        <pre>for deg in range(0, 360, 30):
+    ...
+    if thick[sy, sx] == 0:
+        continue
+    dot = vx*nx + vy*ny
+    vx = (vx - 2*dot*nx) * RESTITUTION
+    vy = (vy - 2*dot*ny) * RESTITUTION</pre>
+    </div>
+    <div class="section">
+        <h2>4. Colisión con la Mano (modelo de cápsula)</h2>
+        <p>Cada segmento de dedo se modela como una cápsula (segmento de línea con radio). Si la pelota toca una cápsula, se calcula la depenetración, transferencia de velocidad y un impulso extra:</p>
+        <pre>self.x += best_nx * best_overlap      # depenetración
+self.vx = self.vx * 0.3 + hvx * 0.80 # transferencia
+self.vy = self.vy * 0.3 + hvy * 0.80
+self.vx += best_nx * 1.5             # impulso normal
+self.vy += best_ny * 1.5</pre>
+    </div>
+    <div class="section">
+        <h2>5. Seguimiento de Velocidad de la Mano (HandTracker)</h2>
+        <ul>
+            <li>Se guarda la posición del landmark 9 (centro de la palma) cada frame.</li>
+            <li>La velocidad es la diferencia de posición entre el frame actual y el anterior.</li>
+            <li>Se promedian las últimas 5 velocidades para suavizar el movimiento.</li>
+            <li>La velocidad se limita a <b>MAX_HAND_VEL=32 px/frame</b>.</li>
+        </ul>
+        <pre>_vx_buf: deque(maxlen=5)   # historial de velocidades X
+_vy_buf: deque(maxlen=5)   # historial de velocidades Y
+vx = promedio(_vx_buf)
+vy = promedio(_vy_buf)</pre>
+    </div>
+    <div class="section">
+        <h2>6. Renderizado de las Pelotas</h2>
+        <ul>
+            <li><b>Estela:</b> las últimas posiciones se dibujan más pequeñas y oscuras.</li>
+            <li><b>Glow (halo):</b> círculos semitransparentes para el aura luminosa.</li>
+            <li><b>Pelota + brillo especular:</b> círculo sólido y reflejo blanco.</li>
+        </ul>
+        <p>El fondo es el propio fotograma de la cámara, oscurecido al 45% para resaltar las pelotas y efectos.</p>
+    </div>
+    <div class="section">
+        <h2>7. Diagrama General del Flujo</h2>
+        <pre>
+Cámara → MediaPipe AI → HandTracker
+   │         │             │
+   ▼         ▼             ▼
+Canny + Dilatación   apply_hand_force()
+   │         │             │
+   ▼         ▼             ▼
+Pelota.step()      Pelota.draw()
+        </pre>
+    </div>
+    <div class="section">
+        <h2>8. Parámetros Ajustables</h2>
+        <table class="param-table">
+            <tr><th>Parámetro</th><th>Valor</th><th>Descripción</th></tr>
+            <tr><td>GRAVITY</td><td>0.38</td><td>Aceleración gravitatoria (px/frame²)</td></tr>
+            <tr><td>RESTITUTION</td><td>0.70</td><td>Energía conservada en cada rebote (0–1)</td></tr>
+            <tr><td>FRICTION</td><td>0.96</td><td>Rozamiento al deslizarse por el suelo</td></tr>
+            <tr><td>BALL_RADIUS</td><td>12</td><td>Radio de cada pelota en píxeles</td></tr>
+            <tr><td>CANNY_LO</td><td>35</td><td>Umbral bajo del detector de bordes</td></tr>
+            <tr><td>CANNY_HI</td><td>110</td><td>Umbral alto del detector de bordes</td></tr>
+            <tr><td>EDGE_DILATE</td><td>7</td><td>Grosor de las superficies detectadas (px)</td></tr>
+            <tr><td>FINGER_RADIUS</td><td>18</td><td>Radio de cada segmento de dedo para colisión</td></tr>
+            <tr><td>MAX_HAND_VEL</td><td>32.0</td><td>Velocidad máxima heredable de la mano</td></tr>
+            <tr><td>VELOCITY_BLEND</td><td>0.80</td><td>Fracción de velocidad transferida al golpear</td></tr>
+            <tr><td>MAX_BALLS</td><td>30</td><td>Límite máximo de pelotas simultáneas</td></tr>
+            <tr><td>TRAIL_LEN</td><td>16</td><td>Longitud de la estela de cada pelota</td></tr>
+            <tr><td>INIT_BALLS</td><td>10</td><td>Pelotas generadas al inicio</td></tr>
+        </table>
+    </div>
+</div>
+</body>
+</html>

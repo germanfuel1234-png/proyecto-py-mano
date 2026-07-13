@@ -1,0 +1,267 @@
+═══════════════════════════════════════════════════════════════════════════════
+               EXPLICACIÓN DEL CÓDIGO: fisica_camara.py
+     Pelotas con física real que rebotan en bordes detectados por cámara
+═══════════════════════════════════════════════════════════════════════════════
+
+
+─────────────────────────────────────────────────────────────────────────────
+ 1. ¿QUÉ HACE ESTE PROGRAMA EN RESUMEN?
+─────────────────────────────────────────────────────────────────────────────
+
+  El programa abre la cámara, detecta los bordes de cualquier objeto físico
+  que aparezca (una cinta adhesiva, un libro, una regla, tu mano…) y lanza
+  pelotas de colores que rebotan en esos bordes con física realista.
+
+  Adicionalmente, la mano detectada actúa como un objeto sólido: puedes
+  golpear, empujar o arrastrar las pelotas directamente con tus dedos.
+
+  Controles:
+    ESPACIO  →  añadir una pelota
+    R        →  reiniciar todas las pelotas
+    D        →  activar/desactivar modo debug (muestra bordes en verde)
+    ESC      →  salir
+
+
+─────────────────────────────────────────────────────────────────────────────
+ 2. DETECCIÓN DE BORDES (Canny)
+─────────────────────────────────────────────────────────────────────────────
+
+  Para saber dónde hay superficies en la imagen se usa el algoritmo de
+  Canny, que detecta cambios bruscos de intensidad (bordes) en la imagen:
+
+    1. Conversión a escala de grises.
+    2. Suavizado con filtro Gaussiano (5×5) para reducir el ruido.
+    3. Aplicación de Canny con umbrales CANNY_LO=35 y CANNY_HI=110.
+    4. Dilatación del resultado para dar grosor físico a los bordes
+       (EDGE_DILATE=7 px), porque un borde de 1 px sería invisible
+       a efectos de colisión.
+
+  La máscara resultante ("thick") es una imagen binaria donde 0=vacío
+  y 255=superficie sólida.
+
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │  gray  = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)                     │
+  │  blur  = cv2.GaussianBlur(gray, (5, 5), 0)                           │
+  │  edges = cv2.Canny(blur, CANNY_LO, CANNY_HI)                        │
+  │  thick = cv2.dilate(edges, kernel, iterations=1)                     │
+  └──────────────────────────────────────────────────────────────────────┘
+
+  ¿Por qué se enmascara la mano antes de Canny?
+  ─────────────────────────────────────────────
+  La mano tiene su propio sistema de colisión (segmentos de cápsula).
+  Si Canny también detectara los bordes de la mano, habría dos sistemas
+  de colisión en conflicto. La solución es borrar los bordes dentro del
+  contorno convexo (convexHull) de la mano antes de dilatar:
+
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │  hull = cv2.convexHull(pts)                                          │
+  │  cv2.fillConvexPoly(edges, hull, 0)   # borrar bordes de la mano     │
+  └──────────────────────────────────────────────────────────────────────┘
+
+
+─────────────────────────────────────────────────────────────────────────────
+ 3. NORMALES DE SUPERFICIE (gradiente Sobel)
+─────────────────────────────────────────────────────────────────────────────
+
+  Para que la pelota rebote en la dirección correcta se necesita saber
+  la "normal" de la superficie en el punto de contacto (es decir, la
+  dirección perpendicular a la superficie).
+
+  Se usa el operador Sobel, que calcula el gradiente de la imagen de
+  bordes dilatada. El gradiente apunta hacia el interior de la superficie,
+  lo que equivale a la normal:
+
+    gx_map = Sobel en eje X   →  componente horizontal de la normal
+    gy_map = Sobel en eje Y   →  componente vertical de la normal
+
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │  ft = thick.astype(np.float32)                                       │
+  │  gx = cv2.Sobel(ft, cv2.CV_32F, 1, 0, ksize=5)                      │
+  │  gy = cv2.Sobel(ft, cv2.CV_32F, 0, 1, ksize=5)                      │
+  └──────────────────────────────────────────────────────────────────────┘
+
+
+─────────────────────────────────────────────────────────────────────────────
+ 4. FÍSICA DE LAS PELOTAS
+─────────────────────────────────────────────────────────────────────────────
+
+  Cada fotograma, la pelota se actualiza con estas reglas:
+
+  4.1 Gravedad
+  ────────────
+    La velocidad vertical aumenta cada frame:
+      vy += GRAVITY   (GRAVITY = 0.38 px/frame²)
+
+  4.2 Bordes de la ventana
+  ────────────────────────
+    Si la pelota toca el borde de la pantalla, se invierte la velocidad
+    correspondiente y se aplica el coeficiente de rebote:
+      vx = ±|vx| * RESTITUTION   (RESTITUTION = 0.70)
+
+    En el suelo además se aplica rozamiento horizontal:
+      vx *= FRICTION   (FRICTION = 0.96)
+
+  4.3 Colisión con la máscara de bordes
+  ──────────────────────────────────────
+    Se muestrean 12 puntos en el perímetro de la pelota cada 30°.
+    Si alguno de esos puntos toca la máscara ("thick[sy,sx] > 0"):
+
+      a) Se lee la normal del gradiente Sobel en ese pixel: (n_x, n_y)
+      b) Se normaliza a longitud 1.
+      c) Se aplica la fórmula de reflexión física:
+
+         v' = v − 2·(v·n)·n        ← reflexión especular
+         v' *= RESTITUTION          ← pérdida de energía en el rebote
+
+      Si la normal no está disponible (gradiente ≈ 0), se invierte
+      simplemente la velocidad.
+
+      d) La pelota retrocede a su posición anterior para salir
+         de la superficie.
+
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │  for deg in range(0, 360, 30):                                       │
+  │      ...                                                             │
+  │      if thick[sy, sx] == 0:                                          │
+  │          continue                                                    │
+  │      dot = vx*nx + vy*ny                                             │
+  │      vx = (vx - 2*dot*nx) * RESTITUTION                             │
+  │      vy = (vy - 2*dot*ny) * RESTITUTION                             │
+  └──────────────────────────────────────────────────────────────────────┘
+
+
+─────────────────────────────────────────────────────────────────────────────
+ 5. COLISIÓN CON LA MANO (modelo de cápsula)
+─────────────────────────────────────────────────────────────────────────────
+
+  La mano no usa Canny. En su lugar, cada segmento de dedo se modela
+  como una "cápsula" (un cilindro 2D = segmento de línea con radio).
+
+  Se definen 22 segmentos que cubren todos los dedos y la palma:
+    Pulgar:  (0,1)(1,2)(2,3)(3,4)
+    Índice:  (0,5)(5,6)(6,7)(7,8)
+    Medio:   (5,9)(9,10)(10,11)(11,12)
+    Anular:  (9,13)(13,14)(14,15)(15,16)
+    Meñique: (13,17)(17,18)(18,19)(19,20)
+    Palma:   (0,17)(0,5)
+
+  Para cada segmento se calcula el punto más cercano al centro de la
+  pelota (_closest_on_segment). Si la distancia es menor que
+  BALL_RADIUS + FINGER_RADIUS, hay colisión:
+
+    1. Depenetración: la pelota se empuja fuera del overlap.
+    2. Transferencia de velocidad: la pelota hereda parte de la
+       velocidad de la mano (efecto de golpe o arrastre).
+    3. Impulso extra en la dirección normal para que "salte" visiblemente.
+
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │  self.x += best_nx * best_overlap          # depenetración           │
+  │  self.vx = self.vx * 0.3 + hvx * 0.80     # transferencia           │
+  │  self.vy = self.vy * 0.3 + hvy * 0.80                               │
+  │  self.vx += best_nx * 1.5                  # impulso normal          │
+  │  self.vy += best_ny * 1.5                                            │
+  └──────────────────────────────────────────────────────────────────────┘
+
+
+─────────────────────────────────────────────────────────────────────────────
+ 6. SEGUIMIENTO DE VELOCIDAD DE LA MANO (HandTracker)
+─────────────────────────────────────────────────────────────────────────────
+
+  Para simular correctamente el golpe, se necesita conocer la velocidad
+  con la que se mueve la mano. La clase HandTracker la calcula así:
+
+    • Cada frame se guarda la posición del landmark 9 (centro de la palma).
+    • La velocidad es la diferencia de posición entre el frame actual
+      y el anterior.
+    • Para suavizar el movimiento y evitar picos por ruido de detección,
+      se guarda un historial de las últimas 5 velocidades y se promedia.
+    • La velocidad se limita a MAX_HAND_VEL=32 px/frame para evitar
+      que un movimiento muy brusco lance las pelotas fuera de la pantalla.
+
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │  _vx_buf: deque(maxlen=5)   ← historial de velocidades X            │
+  │  _vy_buf: deque(maxlen=5)   ← historial de velocidades Y            │
+  │  vx = promedio(_vx_buf)                                              │
+  │  vy = promedio(_vy_buf)                                              │
+  └──────────────────────────────────────────────────────────────────────┘
+
+
+─────────────────────────────────────────────────────────────────────────────
+ 7. RENDERIZADO DE LAS PELOTAS
+─────────────────────────────────────────────────────────────────────────────
+
+  Cada pelota se dibuja con tres capas visuales:
+
+    1. Estela (trail):
+       Las últimas TRAIL_LEN=16 posiciones se guardan. Cada punto de la
+       estela se dibuja más pequeño y más oscuro según su antigüedad,
+       creando el efecto de movimiento.
+
+    2. Glow (halo):
+       Dos círculos semitransparentes ligeramente más grandes que la
+       pelota se mezclan con la imagen (cv2.addWeighted), produciendo
+       un aura luminosa alrededor de la pelota.
+
+    3. Pelota + brillo especular:
+       Un círculo sólido del color de la pelota y un pequeño círculo
+       blanco desplazado hacia arriba-izquierda para simular el reflejo
+       de una fuente de luz.
+
+  El fondo es el propio fotograma de la cámara, oscurecido al 45%:
+    bg = (frame * 0.45).astype(uint8)
+  Esto mantiene la referencia visual del entorno sin que el vídeo
+  tape las pelotas y efectos.
+
+
+─────────────────────────────────────────────────────────────────────────────
+ 8. DIAGRAMA GENERAL DEL FLUJO
+─────────────────────────────────────────────────────────────────────────────
+
+   ┌──────────┐  fotograma   ┌────────────────┐  21 pts/mano
+   │  Cámara  │ ───────────► │  MediaPipe AI  │ ──────────────────┐
+   └──────────┘              └────────────────┘                   │
+         │                                                         ▼
+         │                           ┌──────────────────────────────────────┐
+         │                           │  HandTracker: velocidad suavizada    │
+         │                           │  de la palma (últimos 5 frames)      │
+         │                           └──────────────┬───────────────────────┘
+         │  (frame sin mano)                         │  velocidad mano
+         ▼                                           ▼
+   ┌─────────────────────┐     ┌──────────────────────────────────────────┐
+   │  Canny + Dilatación │     │  apply_hand_force(): cápsula por segmento│
+   │  ➜ thick (máscara)  │     │  depenetración + transferencia velocidad  │
+   │  Sobel ➜ gx, gy     │     └──────────────────────────────────────────┘
+   └──────────┬──────────┘                          │
+              │  normal de superficie                │
+              ▼                                      ▼
+   ┌────────────────────────────────────────────────────────────────┐
+   │  Pelota.step():  gravedad → rebote paredes → reflexión Canny   │
+   └────────────────────────────────────────────────────────────────┘
+              │
+              ▼
+   ┌────────────────────────────────────────────────────────────────┐
+   │  Pelota.draw():  estela → glow → círculo → brillo especular    │
+   └────────────────────────────────────────────────────────────────┘
+
+
+─────────────────────────────────────────────────────────────────────────────
+ 9. PARÁMETROS AJUSTABLES
+─────────────────────────────────────────────────────────────────────────────
+
+  Parámetro          Valor    Descripción
+  ──────────────────────────────────────────────────────────────────────
+  GRAVITY            0.38     Aceleración gravitatoria (px/frame²)
+  RESTITUTION        0.70     Energía conservada en cada rebote (0–1)
+  FRICTION           0.96     Rozamiento al deslizarse por el suelo
+  BALL_RADIUS        12       Radio de cada pelota en píxeles
+  CANNY_LO           35       Umbral bajo del detector de bordes
+  CANNY_HI           110      Umbral alto del detector de bordes
+  EDGE_DILATE        7        Grosor de las superficies detectadas (px)
+  FINGER_RADIUS      18       Radio de cada segmento de dedo para colisión
+  MAX_HAND_VEL       32.0     Velocidad máxima heredable de la mano
+  VELOCITY_BLEND     0.80     Fracción de velocidad transferida al golpear
+  MAX_BALLS          30       Límite máximo de pelotas simultáneas
+  TRAIL_LEN          16       Longitud de la estela de cada pelota
+  INIT_BALLS         10       Pelotas generadas al inicio
+
+═══════════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,218 @@
+═══════════════════════════════════════════════════════════════════════════════
+                   EXPLICACIÓN DEL CÓDIGO: piano.py
+         Piano virtual controlado con la mano frente a la cámara
+═══════════════════════════════════════════════════════════════════════════════
+
+
+─────────────────────────────────────────────────────────────────────────────
+ 1. ¿QUÉ HACE ESTE PROGRAMA EN RESUMEN?
+─────────────────────────────────────────────────────────────────────────────
+
+  El programa abre la cámara del ordenador, detecta tu mano en tiempo real
+  y convierte cada dedo en una tecla de piano. Cuando doblas un dedo, suena
+  una nota musical. Con la mano derecha suenan Do–Sol y con la izquierda
+  La–Mi (octava arriba).
+
+  No necesita ningún archivo de audio externo: las notas se generan
+  matemáticamente con Python.
+
+
+─────────────────────────────────────────────────────────────────────────────
+ 2. CÓMO SE DETECTA LA MANO (MediaPipe HandLandmarker)
+─────────────────────────────────────────────────────────────────────────────
+
+  Se usa la librería MediaPipe (de Google). Esta librería tiene un modelo
+  de inteligencia artificial entrenado para reconocer manos en imágenes.
+  El modelo se descarga automáticamente al arrancar el programa.
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  hand_detector = mp_vision.HandLandmarker.create_from_options(...)  │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  Cada vez que llega un fotograma de la cámara, el detector analiza la
+  imagen y devuelve una lista de "landmarks" (puntos clave) por cada mano
+  encontrada. MediaPipe detecta exactamente 21 puntos por mano:
+
+       4 (punta pulgar)           8 (índice)   12 (medio)   16 (anular)   20 (meñique)
+       |                          |             |             |             |
+       3                          7            11            15            19
+       |                          |             |             |             |
+       2                          6            10            14            18
+       |                          |             |             |             |
+       1                          5─────────────9────────────13────────────17
+        \                        /
+         0 ──── (muñeca / palma)
+
+  Cada punto tiene coordenadas X e Y entre 0.0 y 1.0 (porcentaje del ancho
+  o alto de la imagen). Por ejemplo, X=0.5 significa el centro horizontal.
+
+
+─────────────────────────────────────────────────────────────────────────────
+ 3. CÓMO SE SABE SI UN DEDO ESTÁ DOBLADO
+─────────────────────────────────────────────────────────────────────────────
+
+  La clave está en comparar la posición vertical (coordenada Y) de DOS
+  puntos específicos de cada dedo:
+
+    • TIP  = punta del dedo  (los puntos 4, 8, 12, 16, 20)
+    • PIP  = nudillo medio   (dos posiciones antes: 2, 6, 10, 14, 18)
+
+  En una pantalla de computadora, el eje Y crece HACIA ABAJO (0 arriba,
+
+  1 abajo). Por eso:
+
+    ╔════════════════════════════════════════════════════════════════════════════════════════════╗
+    ║  DEDO ESTIRADO:  la punta está MÁS ARRIBA que el nudillo                                 ║
+    ║                  ➜  tip.y  <  pip.y                                                      ║
+    ║                                                                                          ║
+    ║  DEDO DOBLADO:   la punta cae MÁS ABAJO que el nudillo                                   ║
+    ║                  ➜  tip.y  >  pip.y  + margen                                            ║
+    ║                                                                                          ║
+    ║  El margen es diferente para el pulgar y el resto de los dedos:                          ║
+    ║     • Pulgar:   +0.10  (más fácil de activar, ya que es difícil doblarlo mucho)           ║
+    ║     • Otros:    +0.04  (tolerancia estándar para evitar falsos positivos)                ║
+    ╚════════════════════════════════════════════════════════════════════════════════════════════╝
+
+  Así se evita que el pulgar requiera doblarse demasiado para sonar, facilitando su uso.
+
+  En el código:
+
+  ┌─────────────────────────────────────────────────────────────────────────────┐
+  │  tip = hand_landmarks[tip_id]                                               │
+  │  pip = hand_landmarks[tip_id - 2 if tip_id != 4 else 2]                    │
+  │                                                                            │
+  │  if tip_id == 4:        # Pulgar                                           │
+  │      margen = 0.10                                                          │
+  │  else:                                                                     │
+  │      margen = 0.04                                                          │
+  │  flexionado = tip.y > pip.y + margen                                       │
+  └─────────────────────────────────────────────────────────────────────────────┘
+
+  El caso especial "tip_id != 4 else 2" es para el pulgar, cuya estructura
+  de puntos es diferente a los demás dedos.
+
+
+─────────────────────────────────────────────────────────────────────────────
+ 4. CÓMO SE DISPARA LA NOTA (solo una vez por gesto)
+─────────────────────────────────────────────────────────────────────────────
+
+  Un problema clásico: si la nota sonara en cada fotograma mientras el dedo
+  está doblado, sonaría cientos de veces por segundo. Para resolverlo se
+  usa un diccionario "dedos_presionados" que actúa como memoria de estado:
+
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │  if flexionado:                                                      │
+  │      if not dedos_presionados.get(clave, False):  # ¿primera vez?   │
+  │          play_note(SONIDOS[nota_idx])             # ➜ suena UNA vez │
+  │          dedos_presionados[clave] = True          # marcar como ya  │
+  │  else:                                                               │
+  │      dedos_presionados[clave] = False             # dedo levantado  │
+  └──────────────────────────────────────────────────────────────────────┘
+
+  Flujo completo de un gesto:
+
+    1. Fotograma N:   dedo estirado  → flexionado=False  → sin sonido
+    2. Fotograma N+1: dedo se dobla  → flexionado=True   → es la 1ª vez
+                                                           → ¡SUENA LA NOTA!
+                                                           → marca = True
+    3. Fotograma N+2: dedo doblado   → flexionado=True   → ya estaba marcado
+                                                           → no suena de nuevo
+    4. Fotograma N+3: dedo se estira → flexionado=False  → marca = False
+                                                           → listo p/ el next
+
+
+─────────────────────────────────────────────────────────────────────────────
+ 5. CÓMO SE ASIGNA CADA DEDO A UNA NOTA
+─────────────────────────────────────────────────────────────────────────────
+
+  Las 10 notas (Do a Mi8) se distribuyen así:
+
+    Mano 0 (primera detectada):   pulgar=Do  índice=Re  medio=Mi  anular=Fa  meñique=Sol
+    Mano 1 (segunda detectada):   pulgar=La  índice=Si  medio=Do8 anular=Re8 meñique=Mi8
+
+  La fórmula es:
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │  nota_idx = (hand_idx * 5 + i) % len(SONIDOS)                       │
+  └──────────────────────────────────────────────────────────────────────┘
+
+  Donde hand_idx es 0 o 1 (la mano) e i es 0..4 (el dedo).
+
+
+─────────────────────────────────────────────────────────────────────────────
+ 6. CÓMO SE GENERAN LOS SONIDOS (sin archivos .mp3 ni .wav)
+─────────────────────────────────────────────────────────────────────────────
+
+  La función generar_nota() crea el sonido matemáticamente usando ondas
+  sinusoidales (la forma de onda más básica del sonido):
+
+    onda = sin(2π·f·t)           ← frecuencia fundamental  (más fuerte)
+         + sin(2π·2f·t)          ← 2º armónico             (más suave)
+         + sin(2π·3f·t)          ← 3º armónico             (aún más suave)
+         + sin(2π·4f·t)          ← 4º armónico             (muy suave)
+
+  Combinar armónicos hace que suene más parecido a un instrumento real y
+  menos a un pitido electrónico.
+
+  Luego se aplica una "envolvente" (envelope):
+    • Attack  (5 ms):   volumen sube de 0 a 1 → evita el "clic" al inicio
+    • Sustain          : volumen plano en 1
+    • Release (350 ms): volumen baja de 1 a 0 → la nota se apaga suavemente
+
+  Las frecuencias (en Hz) de cada nota son:
+    Do=261  Re=294  Mi=330  Fa=349  Sol=392  La=440  Si=494
+    Do8=523  Re8=587  Mi8=659
+
+
+─────────────────────────────────────────────────────────────────────────────
+ 7. CÓMO SE MEZCLAN VARIAS NOTAS A LA VEZ (poliafonía)
+─────────────────────────────────────────────────────────────────────────────
+
+  Si doblas varios dedos al mismo tiempo, todas las notas deben sonar
+  simultáneamente. Para eso existe el "mezclador" basado en un hilo de audio:
+
+    • _active  : lista de notas que están sonando en este momento
+    • _callback: función que el sistema de audio llama ~86 veces/segundo
+                 (cada 512 muestras a 44100 Hz)
+
+  Dentro del callback se suman las muestras de todas las notas activas
+  y se limita el resultado a [-1.0, 1.0] para no distorsionar el audio.
+
+  play_note() simplemente añade la nota a la lista _active.
+  Cuando una nota llega al final de sus muestras, el callback la elimina.
+  Todo está protegido por un threading.Lock() para evitar corrupción de datos
+  si el hilo de audio y el hilo principal acceden a la lista al mismo tiempo.
+
+
+─────────────────────────────────────────────────────────────────────────────
+ 8. DIAGRAMA GENERAL DEL FLUJO
+─────────────────────────────────────────────────────────────────────────────
+
+   ┌──────────┐     fotograma    ┌────────────────┐   21 puntos/mano
+   │  Cámara  │ ──────────────► │   MediaPipe AI  │ ──────────────────┐
+   └──────────┘                 └────────────────┘                    │
+                                                                       ▼
+                                              ┌──────────────────────────────────┐
+                                              │  Comparar tip.y vs pip.y         │
+                                              │  ¿dedo doblado? ¿primera vez?    │
+                                              └──────────────────┬───────────────┘
+                                                                 │ sí
+                                                                 ▼
+                                              ┌──────────────────────────────────┐
+                                              │  play_note() → _active[]         │
+                                              └──────────────────┬───────────────┘
+                                                                 │
+                                                                 ▼
+                                              ┌──────────────────────────────────┐
+                                              │  _callback() mezcla y envía      │
+                                              │  las muestras al altavoz         │
+                                              └──────────────────────────────────┘
+
+
+─────────────────────────────────────────────────────────────────────────────
+ 9. CONTROLES
+─────────────────────────────────────────────────────────────────────────────
+
+   ESC  →  cierra el programa
+
+
+═══════════════════════════════════════════════════════════════════════════════

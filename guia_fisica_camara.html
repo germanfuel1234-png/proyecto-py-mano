@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cátedra: fisica_camara.py</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --card: #21253a;
+            --accent: #6c63ff;
+            --accent2: #00d4ff;
+            --accent3: #ff6b6b;
+            --text: #e2e8f0;
+            --text-muted: #8892a4;
+            --code-bg: #0d1117;
+            --code-border: #30363d;
+            --green: #3dffa0;
+            --yellow: #ffd166;
+            --radius: 12px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.75;
+        }
+
+        /* ── Hero ── */
+        .hero {
+            background: linear-gradient(135deg, #1a1d27 0%, #12162b 50%, #1a1d27 100%);
+            border-bottom: 1px solid #2a2f45;
+            padding: 3.5rem 2rem 2.5rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(108,99,255,0.18), transparent);
+        }
+        .hero-badge {
+            display: inline-block;
+            background: rgba(108,99,255,0.18);
+            color: var(--accent);
+            border: 1px solid rgba(108,99,255,0.4);
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            padding: 0.3rem 1rem;
+            margin-bottom: 1.2rem;
+        }
+        .hero h1 {
+            font-size: clamp(1.8rem, 4vw, 2.8rem);
+            font-weight: 800;
+            background: linear-gradient(90deg, #fff 0%, var(--accent2) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.8rem;
+        }
+        .hero p {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            max-width: 680px;
+            margin: 0 auto;
+        }
+
+        /* ── Layout ── */
+        .container { max-width: 920px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+
+        /* ── Secciones ── */
+        .section { margin-bottom: 3rem; }
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.4rem;
+            padding-bottom: 0.6rem;
+            border-bottom: 1px solid #2a2f45;
+        }
+        .section-num {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: #fff;
+            font-weight: 800;
+            font-size: 0.85rem;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        h2 { font-size: 1.45rem; font-weight: 700; color: #fff; }
+        h3 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--accent2);
+            margin: 1.8rem 0 0.6rem;
+        }
+        p { color: var(--text-muted); margin-bottom: 0.8rem; }
+
+        /* ── Tarjetas de librería ── */
+        .libs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        .lib-card {
+            background: var(--card);
+            border: 1px solid #2a2f45;
+            border-radius: var(--radius);
+            padding: 1.1rem 1.2rem;
+            transition: border-color 0.2s;
+        }
+        .lib-card:hover { border-color: var(--accent); }
+        .lib-card .lib-name {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--accent2);
+            margin-bottom: 0.4rem;
+        }
+        .lib-card p { font-size: 0.88rem; margin: 0; }
+
+        /* ── Bloques de código ── */
+        .code-block {
+            background: var(--code-bg);
+            border: 1px solid var(--code-border);
+            border-radius: var(--radius);
+            margin: 1rem 0 1.2rem;
+            overflow: hidden;
+        }
+        .code-label {
+            background: #161b22;
+            border-bottom: 1px solid var(--code-border);
+            padding: 0.45rem 1rem;
+            font-size: 0.75rem;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            color: #6e7681;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .code-label::before {
+            content: '';
+            display: inline-block;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+        pre {
+            padding: 1.2rem 1.2rem;
+            overflow-x: auto;
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.85rem;
+            line-height: 1.7;
+            color: #e6edf3;
+            margin: 0;
+        }
+        /* Coloreado manual de tokens */
+        .kw  { color: #ff7b72; }   /* keywords */
+        .fn  { color: #d2a8ff; }   /* funciones/métodos */
+        .cl  { color: #ffa657; }   /* clases */
+        .st  { color: #a5d6ff; }   /* strings */
+        .cm  { color: #8b949e; }   /* comentarios */
+        .nm  { color: #79c0ff; }   /* números/constantes */
+        .at  { color: #e6edf3; }   /* atributos/texto normal */
+        .sf  { color: #3dffa0; }   /* self */
+
+        /* ── Callout de explicación ── */
+        .callout {
+            background: rgba(108,99,255,0.08);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            padding: 0.9rem 1.2rem;
+            margin: 0.5rem 0 1.4rem;
+            font-size: 0.92rem;
+            color: var(--text);
+        }
+        .callout strong { color: var(--accent2); }
+        .callout ul { padding-left: 1.3rem; margin-top: 0.5rem; }
+        .callout li { margin-bottom: 0.35rem; color: var(--text-muted); }
+        .callout li strong { color: var(--text); }
+
+        /* ── Actividades ── */
+        .act-card {
+            background: var(--card);
+            border: 1px solid #2a2f45;
+            border-radius: var(--radius);
+            padding: 1.2rem 1.4rem;
+            margin-bottom: 1rem;
+            position: relative;
+            transition: border-color 0.2s;
+        }
+        .act-card:hover { border-color: var(--accent); }
+        .act-card.practica { border-left: 4px solid var(--green); }
+        .act-type {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+            display: inline-block;
+            margin-bottom: 0.6rem;
+        }
+        .tag-teorica { background: rgba(0,212,255,0.12); color: var(--accent2); }
+        .tag-practica { background: rgba(61,255,160,0.12); color: var(--green); }
+        .act-card h4 { color: #fff; font-size: 0.97rem; margin-bottom: 0.4rem; }
+        .act-card p { font-size: 0.88rem; margin: 0; }
+        .act-card .code-block { margin-top: 1rem; }
+
+        /* ── Inline code ── */
+        code {
+            background: rgba(108,99,255,0.15);
+            color: var(--accent2);
+            padding: 0.15em 0.45em;
+            border-radius: 4px;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            font-size: 0.88em;
+        }
+
+        /* ── Tabla de landmarks ── */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.87rem;
+            margin: 1rem 0;
+        }
+        th {
+            background: #161b22;
+            color: var(--accent2);
+            padding: 0.6rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--code-border);
+        }
+        td {
+            padding: 0.55rem 1rem;
+            border-bottom: 1px solid #1e2336;
+            color: var(--text-muted);
+        }
+        tr:hover td { background: rgba(255,255,255,0.03); }
+
+        /* ── Footer ── */
+        footer {
+            text-align: center;
+            padding: 2rem;
+            font-size: 0.82rem;
+            color: #3a4060;
+            border-top: 1px solid #1e2336;
+        }
+    </style>
+</head>
+<body>
+
+<header class="hero">
+    <div class="hero-badge">Cátedra de Programación</div>
+    <h1>fisica_camara.py — Guía Completa</h1>
+    <p>Visión por computadora + física simulada + detección de manos.<br>
+    Todo lo que necesitás saber para presentar y defender el proyecto.</p>
+</header>
+
+<div class="container">
+
+    <!-- ══════════════════════════════════════════════════════
+         SECCIÓN 1: QUÉ HACE EL PROGRAMA
+    ══════════════════════════════════════════════════════ -->
+    <div class="section">
+        <div class="section-header">
+            <div class="section-num">1</div>
+            <h2>¿Qué hace el programa?</h2>
+        </div>
+        <p>
+            El programa accede a la cámara web en tiempo real y aplica el algoritmo de detección de bordes
+            <strong>Canny</strong> para encontrar las superficies físicas del mundo (una mano, una regla, un libro, cinta adhesiva).
+            Sobre esa imagen genera pelotas virtuales que caen, rebotan y colisionan con esas superficies
+            siguiendo leyes reales de física (gravedad, restitución, rozamiento).
+            La mano del usuario, detectada por <strong>MediaPipe</strong> a través de <code>mano2.py</code>,
+            puede golpear y empujar las pelotas directamente.
+        </p>
+       <h3>¿Cómo funciona el algoritmo de detección de bordes Canny?</h3>
+       <div class="callout">
+           <strong>Canny</strong> es un algoritmo clásico de visión por computadora que detecta los bordes (contornos) de los objetos en una imagen. Su funcionamiento tiene varias etapas:
+           <ul>
+               <li><strong>1. Suavizado (GaussianBlur):</strong> Se aplica un filtro para reducir el ruido y evitar falsos bordes.</li>
+               <li><strong>2. Gradiente:</strong> Calcula para cada píxel cuánto cambia la intensidad de la imagen (con Sobel). Donde hay un cambio brusco, probablemente hay un borde.</li>
+               <li><strong>3. Supresión de no-máximos:</strong> Solo se conservan los puntos donde el gradiente es máximo (el borde "real").</li>
+               <li><strong>4. Umbral doble:</strong> Se usan dos valores (CANNY_LO y CANNY_HI) para decidir qué bordes son fuertes, cuáles débiles y cuáles se descartan.</li>
+               <li><strong>5. Conectividad:</strong> Los bordes débiles solo se conservan si están conectados a uno fuerte.</li>
+           </ul>
+           El resultado es una imagen binaria donde los bordes de todos los objetos físicos aparecen en blanco. ¡Por eso la pelota puede rebotar en cualquier cosa que "dibujes" o pongas frente a la cámara!
+       </div>
+        <p>Controles del teclado:</p>
+        <div class="callout">
+            <ul>
+                <li><strong>ESPACIO</strong> → agrega una pelota nueva</li>
+                <li><strong>R</strong> → reinicia todas las pelotas</li>
+                <li><strong>D</strong> → activa/desactiva modo debug (muestra bordes Canny en pantalla)</li>
+                <li><strong>ESC</strong> → cierra el programa</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         SECCIÓN 2: LIBRERÍAS
+    ══════════════════════════════════════════════════════ -->
+    <div class="section">
+        <div class="section-header">
+            <div class="section-num">2</div>
+            <h2>Librerías utilizadas</h2>
+        </div>
+        <div class="libs-grid">
+            <div class="lib-card">
+                <div class="lib-name">cv2 (OpenCV)</div>
+                <p>Captura la cámara fotograma a fotograma, aplica filtros, detecta bordes con Canny y dibuja las pelotas sobre la imagen.</p>
+            </div>
+            <div class="lib-card">
+                <div class="lib-name">numpy</div>
+                <p>Maneja las matrices de píxeles como arrays matemáticos. Se usa para calcular gradientes Sobel, magnitudes de vectores y operaciones de álgebra vectorial.</p>
+            </div>
+            <div class="lib-card">
+                <div class="lib-name">random</div>
+                <p>Da posición inicial, velocidad y color aleatorio a cada pelota al crearla.</p>
+            </div>
+            <div class="lib-card">
+                <div class="lib-name">collections.deque</div>
+                <p>Estructura de dato de cola con tamaño máximo fijo. Se usa para la <em>estela</em> de cada pelota y para suavizar la velocidad de la mano.</p>
+            </div>
+            <div class="lib-card">
+                <div class="lib-name">mediapipe</div>
+                <p>Motor de IA de Google que detecta los 21 puntos (landmarks) de la mano en tiempo real a partir de la imagen de la cámara.</p>
+            </div>
+            <div class="lib-card">
+                <div class="lib-name">mano2.py</div>
+                <p>Archivo propio del proyecto. Encapsula toda la lógica de MediaPipe en la clase <code>HandDetector</code>: detección, dibujo y gestos (mano abierta, cerrada, zoom, shaka…).</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         SECCIÓN 3: ESTRUCTURA Y FRAGMENTOS
+    ══════════════════════════════════════════════════════ -->
+    <div class="section">
+        <div class="section-header">
+            <div class="section-num">3</div>
+            <h2>Estructura del código explicada</h2>
+        </div>
+
+       <h3>Resumen de la física utilizada</h3>
+       <div class="callout">
+           <strong>El programa simula tres leyes físicas principales:</strong>
+           <ul>
+               <li><strong>Gravedad:</strong> Cada fotograma, la velocidad vertical de la pelota (<code>vy</code>) aumenta en <code>GRAVITY</code>. Esto simula la aceleración hacia abajo que experimentan los objetos en la vida real.</li>
+               <li><strong>Restitución:</strong> Cuando la pelota rebota contra una superficie, su velocidad se multiplica por <code>RESTITUTION</code> (&lt;1). Esto simula la pérdida de energía en el rebote: nunca rebota a la misma altura que antes.</li>
+               <li><strong>Rozamiento:</strong> Al tocar el suelo, la velocidad horizontal (<code>vx</code>) se multiplica por <code>FRICTION</code>. Así, la pelota va frenando poco a poco hasta detenerse.</li>
+           </ul>
+           <strong>¿Por qué es importante esto?</strong> Porque hace que el movimiento de la pelota sea realista y predecible, como en la física del mundo real.
+       </div>
+
+        <!-- 3.1 Importaciones -->
+        <h3>3.1 Importación de librerías</h3>
+        <div class="code-block">
+            <div class="code-label">fisica_camara.py — líneas 13-16</div>
+            <pre><span class="kw">import</span> cv2
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+<span class="kw">import</span> random
+<span class="kw">from</span> collections <span class="kw">import</span> deque
+<span class="kw">from</span> mano2 <span class="kw">import</span> <span class="cl">HandDetector</span></pre>
+        </div>
+        <div class="callout">
+            La última línea importa únicamente la clase <code>HandDetector</code> definida en <strong>mano2.py</strong>.
+            Esto es un ejemplo de <strong>modularización</strong>: separar responsabilidades en distintos archivos para que cada uno sea más fácil de mantener y entender.
+        </div>
+
+        <!-- 3.2 Constantes globales -->
+        <h3>3.2 Constantes de física y parámetros</h3>
+        <div class="code-block">
+            <div class="code-label">fisica_camara.py — parámetros globales</div>
+            <pre><span class="cl">GRAVITY</span>     = <span class="nm">0.38</span>   <span class="cm"># aceleración gravitatoria (px/frame²)</span>
+<span class="cl">RESTITUTION</span> = <span class="nm">0.70</span>   <span class="cm"># coeficiente de rebote (0=muerto, 1=perfecto)</span>
+<span class="cl">FRICTION</span>    = <span class="nm">0.96</span>   <span class="cm"># rozamiento al deslizar sobre superficie</span>
+<span class="cl">BALL_RADIUS</span> = <span class="nm">12</span>     <span class="cm"># radio de la pelota en píxeles</span>
+
+<span class="cl">CANNY_LO</span>    = <span class="nm">35</span>     <span class="cm"># umbral bajo del detector de bordes Canny</span>
+<span class="cl">CANNY_HI</span>    = <span class="nm">110</span>    <span class="cm"># umbral alto del detector de bordes Canny</span></pre>
+        </div>
+        <div class="callout">
+            <strong>¿Por qué usar constantes en mayúsculas?</strong><br>
+            Por convención en Python, las variables escritas en MAYÚSCULAS son constantes: valores que no deben cambiar durante la ejecución.
+            Centralizarlos al inicio del archivo permite ajustar toda la física del programa tocando un solo lugar.
+            <ul>
+                <li><strong>GRAVITY</strong>: cuánto se acelera la pelota hacia abajo en cada fotograma.</li>
+                <li><strong>RESTITUTION</strong>: fracción de velocidad que conserva la pelota al rebotar. 1.0 = rebote perfecto, 0 = se queda quieta.</li>
+                <li><strong>FRICTION</strong>: multiplica la velocidad horizontal al tocar el suelo, simulando rozamiento.</li>
+            </ul>
+        </div>
+
+        <!-- 3.3 Clase HandTracker -->
+        <h3>3.3 Clase <code>HandTracker</code> — seguimiento de velocidad de la mano</h3>
+        <div class="code-block">
+            <div class="code-label">fisica_camara.py — clase HandTracker</div>
+            <pre><span class="kw">class</span> <span class="cl">HandTracker</span>:
+    <span class="st">"""Calcula la velocidad suavizada del centro de la palma."""</span>
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="sf">self</span>):
+        <span class="sf">self</span>._prev = <span class="nm">None</span>
+        <span class="sf">self</span>._vx_buf: deque = <span class="fn">deque</span>(maxlen=<span class="nm">5</span>)
+        <span class="sf">self</span>._vy_buf: deque = <span class="fn">deque</span>(maxlen=<span class="nm">5</span>)
+        <span class="sf">self</span>.vx = <span class="nm">0.0</span>
+        <span class="sf">self</span>.vy = <span class="nm">0.0</span>
+
+    <span class="kw">def</span> <span class="fn">update</span>(<span class="sf">self</span>, hand, w, h):
+        cx = hand[<span class="nm">9</span>].x * w   <span class="cm"># landmark 9 = centro de la palma</span>
+        cy = hand[<span class="nm">9</span>].y * h
+        <span class="kw">if</span> <span class="sf">self</span>._prev <span class="kw">is not</span> <span class="nm">None</span>:
+            <span class="sf">self</span>._vx_buf.<span class="fn">append</span>(cx - <span class="sf">self</span>._prev[<span class="nm">0</span>])
+            <span class="sf">self</span>._vy_buf.<span class="fn">append</span>(cy - <span class="sf">self</span>._prev[<span class="nm">1</span>])
+            raw_vx = <span class="fn">sum</span>(<span class="sf">self</span>._vx_buf) / <span class="fn">len</span>(<span class="sf">self</span>._vx_buf)
+            raw_vy = <span class="fn">sum</span>(<span class="sf">self</span>._vy_buf) / <span class="fn">len</span>(<span class="sf">self</span>._vy_buf)</pre>
+        </div>
+        <div class="callout">
+            <strong>¿Qué es una clase?</strong> Una clase es un molde o plantilla para crear objetos. Define qué datos tiene ese objeto (atributos) y qué puede hacer (métodos).<br><br>
+            <strong>¿Qué hace esta clase específicamente?</strong>
+            <ul>
+                <li>En cada fotograma recibe la posición de la palma (landmark 9) y calcula cuánto se movió respecto al fotograma anterior → eso es la <em>velocidad</em>.</li>
+                <li>El <code>deque(maxlen=5)</code> guarda los últimos 5 valores de velocidad. Al promediarlos, la velocidad se "suaviza" y no hay saltos bruscos.</li>
+                <li>Esta velocidad suavizada se transfiere después a las pelotas cuando la mano las golpea.</li>
+            </ul>
+        </div>
+
+        <!-- 3.4 Clase Pelota -->
+        <h3>3.4 Clase <code>Pelota</code> — el objeto principal</h3>
+        <div class="code-block">
+            <div class="code-label">fisica_camara.py — clase Pelota (constructor y step)</div>
+            <pre><span class="kw">class</span> <span class="cl">Pelota</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="sf">self</span>, x: float, y: float):
+        <span class="sf">self</span>.x     = <span class="fn">float</span>(x)
+        <span class="sf">self</span>.y     = <span class="fn">float</span>(y)
+        <span class="sf">self</span>.vx    = random.<span class="fn">uniform</span>(-<span class="nm">5.0</span>,  <span class="nm">5.0</span>)   <span class="cm"># velocidad horizontal aleatoria</span>
+        <span class="sf">self</span>.vy    = random.<span class="fn">uniform</span>(-<span class="nm">6.0</span>, -<span class="nm">1.0</span>)   <span class="cm"># velocidad vertical (siempre hacia arriba)</span>
+        <span class="sf">self</span>.color = random.<span class="fn">choice</span>(COLORS)
+        <span class="sf">self</span>.trail: deque = <span class="fn">deque</span>(maxlen=<span class="nm">TRAIL_LEN</span>)
+
+    <span class="kw">def</span> <span class="fn">step</span>(<span class="sf">self</span>, h, w, thick, gx_map, gy_map):
+        <span class="sf">self</span>.vy += <span class="cl">GRAVITY</span>          <span class="cm"># acumula gravedad cada frame</span>
+        nx = <span class="sf">self</span>.x + <span class="sf">self</span>.vx       <span class="cm"># posición candidata X</span>
+        ny = <span class="sf">self</span>.y + <span class="sf">self</span>.vy       <span class="cm"># posición candidata Y</span>
+
+        <span class="cm"># Colisión con el borde derecho de la ventana</span>
+        <span class="kw">elif</span> nx + <span class="cl">BALL_RADIUS</span> > w:
+            nx = <span class="fn">float</span>(w - <span class="cl">BALL_RADIUS</span>)
+            <span class="sf">self</span>.vx = -<span class="fn">abs</span>(<span class="sf">self</span>.vx) * <span class="cl">RESTITUTION</span></pre>
+        </div>
+        <div class="callout">
+            <strong>El método <code>step()</code></strong> se llama una vez por fotograma y es el "corazón" de la física:<br>
+            <ul>
+                <li><strong>Gravedad</strong>: <code>self.vy += GRAVITY</code> incrementa la velocidad vertical en cada frame, igual que en la física real.</li>
+                <li><strong>Posición candidata</strong>: antes de mover la pelota, se calcula la posición <em>siguiente</em> (<code>nx, ny</code>) y se verifica si colisiona. Si hay colisión, se corrige la posición y se invierte la velocidad.</li>
+                <li><strong>RESTITUTION</strong>: al rebotar, la velocidad se multiplica por este factor (0.70), simulando pérdida de energía en el impacto.</li>
+                <li><strong>trail</strong>: el <code>deque</code> guarda las últimas posiciones de la pelota para dibujar la estela visual.</li>
+            </ul>
+        </div>
+
+        <!-- 3.5 Colisión con bordes Canny -->
+        <h3>3.5 Colisión con bordes detectados por Canny (<code>_collide</code>)</h3>
+        <div class="code-block">
+            <div class="code-label">fisica_camara.py — método _collide</div>
+            <pre><span class="kw">def</span> <span class="fn">_collide</span>(<span class="sf">self</span>, nx, ny, h, w, thick, gx_map, gy_map):
+    <span class="kw">for</span> deg <span class="kw">in</span> <span class="fn">range</span>(<span class="nm">0</span>, <span class="nm">360</span>, <span class="nm">30</span>):   <span class="cm"># 12 puntos en el perímetro</span>
+        rad = np.<span class="fn">deg2rad</span>(deg)
+        sx  = <span class="fn">int</span>(np.<span class="fn">clip</span>(nx + <span class="cl">BALL_RADIUS</span> * np.<span class="fn">cos</span>(rad), <span class="nm">0</span>, w - <span class="nm">1</span>))
+        sy  = <span class="fn">int</span>(np.<span class="fn">clip</span>(ny + <span class="cl">BALL_RADIUS</span> * np.<span class="fn">sin</span>(rad), <span class="nm">0</span>, h - <span class="nm">1</span>))
+
+        <span class="kw">if</span> thick[sy, sx] == <span class="nm">0</span>:
+            <span class="kw">continue</span>   <span class="cm"># no hay borde aquí</span>
+
+        <span class="cm"># Normal de la superficie (gradiente Sobel)</span>
+        n_x = <span class="fn">float</span>(gx_map[sy, sx])
+        n_y = <span class="fn">float</span>(gy_map[sy, sx])
+        mag = np.<span class="fn">hypot</span>(n_x, n_y)
+        n_x /= mag; n_y /= mag
+
+        <span class="cm"># Reflexión física: v' = v - 2(v·n)n</span>
+        dot = <span class="sf">self</span>.vx * n_x + <span class="sf">self</span>.vy * n_y
+        <span class="sf">self</span>.vx = (<span class="sf">self</span>.vx - <span class="nm">2.0</span> * dot * n_x) * <span class="cl">RESTITUTION</span>
+        <span class="sf">self</span>.vy = (<span class="sf">self</span>.vy - <span class="nm">2.0</span> * dot * n_y) * <span class="cl">RESTITUTION</span></pre>
+        </div>
+        <div class="callout">
+                <strong>Esta es la parte más avanzada del código.</strong><br>
+                <ul>
+                    <li><strong>1. Muestreo del perímetro:</strong> Se calculan 12 puntos alrededor de la pelota (cada 30°) usando trigonometría (<code>cos</code>/<code>sin</code>). Si alguno de esos puntos toca un borde detectado por Canny, se considera que la pelota colisionó con un objeto real.</li>
+                    <li><strong>2. Normal de la superficie (con Sobel):</strong> En el punto de contacto, se calcula el gradiente de la imagen (con Sobel) para saber en qué dirección "empuja" la superficie. Esto permite que la pelota rebote correctamente aunque el objeto esté inclinado o curvado.</li>
+                    <li><strong>3. Reflexión física real:</strong> Se usa la fórmula <code>v' = v − 2(v·n)n</code>, donde <code>v</code> es la velocidad de la pelota y <code>n</code> la normal de la superficie. El producto escalar <code>v·n</code> mide cuánto de la velocidad va en dirección de la normal. Así, la pelota rebota con el ángulo correcto, como en la vida real.</li>
+                    <li><strong>4. Retroceso seguro:</strong> Si hay colisión, la pelota se "retrocede" al último punto seguro para evitar que atraviese el objeto.</li>
+                </ul>
+                <strong>¿Por qué es difícil?</strong> Porque no importa la forma ni el ángulo del objeto real: la pelota rebota igual de bien en una regla, una mano, una línea dibujada o una superficie curva. Todo esto se logra combinando visión por computadora (Canny + Sobel) y física vectorial real.
+        </div>
+
+        <!-- 3.6 Colisión con la mano -->
+        <h3>3.6 Colisión con la mano (<code>apply_hand_force</code>)</h3>
+        <div class="code-block">
+            <div class="code-label">fisica_camara.py — apply_hand_force (simplificado)</div>
+            <pre><span class="kw">def</span> <span class="fn">apply_hand_force</span>(<span class="sf">self</span>, lm_px, hvx, hvy):
+    <span class="kw">for</span> (i, j) <span class="kw">in</span> <span class="cl">FINGER_SEGMENTS</span>:
+        ax, ay = lm_px[i]
+        bx, by = lm_px[j]
+        cx, cy, dist = <span class="fn">_closest_on_segment</span>(ax, ay, bx, by, <span class="sf">self</span>.x, <span class="sf">self</span>.y)
+        combined = <span class="cl">BALL_RADIUS</span> + <span class="cl">FINGER_RADIUS</span>
+        <span class="kw">if</span> dist < combined:         <span class="cm"># hay overlap → colisión</span>
+            overlap = combined - dist
+            <span class="cm"># 1. Depenetración: sacar la pelota del dedo</span>
+            <span class="sf">self</span>.x += best_nx * overlap
+            <span class="sf">self</span>.y += best_ny * overlap
+            <span class="cm"># 2. Transferir velocidad de la mano a la pelota</span>
+            <span class="sf">self</span>.vx = <span class="sf">self</span>.vx * <span class="nm">0.3</span> + hvx * <span class="cl">VELOCITY_BLEND</span>
+            <span class="sf">self</span>.vy = <span class="sf">self</span>.vy * <span class="nm">0.3</span> + hvy * <span class="cl">VELOCITY_BLEND</span></pre>
+        </div>
+        <div class="callout">
+            <strong>Cápsula por segmento de dedo:</strong> cada dedo no se trata como un punto, sino como un <em>segmento</em> de línea.
+            La función <code>_closest_on_segment()</code> encuentra el punto del segmento más cercano a la pelota.
+            Si esa distancia es menor que la suma de radios (<code>BALL_RADIUS + FINGER_RADIUS</code>), hay colisión.<br><br>
+            La respuesta tiene dos partes: <strong>depenetración</strong> (mover la pelota fuera del dedo para que no se "encaje") y <strong>transferencia de impulso</strong> (darle a la pelota la velocidad de la mano multiplicada por <code>VELOCITY_BLEND</code>).
+        </div>
+
+        <!-- 3.7 mano2.py -->
+        <h3>3.7 Clase <code>HandDetector</code> en mano2.py</h3>
+        <div class="code-block">
+            <div class="code-label">mano2.py — detección y gestos</div>
+            <pre><span class="kw">def</span> <span class="fn">is_hand_closed</span>(<span class="sf">self</span>, hand_landmarks):
+    fingers = [<span class="nm">8</span>, <span class="nm">12</span>, <span class="nm">16</span>, <span class="nm">20</span>]   <span class="cm"># puntas de los 4 dedos</span>
+    closed_fingers = <span class="nm">0</span>
+    <span class="kw">for</span> tip <span class="kw">in</span> fingers:
+        <span class="kw">if</span> hand_landmarks[tip].y > hand_landmarks[tip - <span class="nm">2</span>].y:
+            closed_fingers += <span class="nm">1</span>
+    <span class="kw">return</span> closed_fingers >= <span class="nm">3</span>
+
+<span class="kw">def</span> <span class="fn">is_hand_open</span>(<span class="sf">self</span>, hand_landmarks):
+    fingers = [<span class="nm">8</span>, <span class="nm">12</span>, <span class="nm">16</span>, <span class="nm">20</span>]
+    open_fingers = <span class="nm">0</span>
+    <span class="kw">for</span> tip <span class="kw">in</span> fingers:
+        <span class="kw">if</span> hand_landmarks[tip].y < hand_landmarks[tip - <span class="nm">2</span>].y:
+            open_fingers += <span class="nm">1</span>
+    <span class="kw">return</span> open_fingers >= <span class="nm">4</span></pre>
+        </div>
+        <div class="callout">
+            <strong>Los 21 landmarks de MediaPipe</strong> son puntos numerados de la mano. La punta del índice es el landmark 8, su segunda articulación es el 6.
+            Si el landmark 8 tiene un valor Y <em>mayor</em> que el 6, significa que la punta está por debajo de la articulación → el dedo está doblado.
+            <br><br>
+            La siguiente tabla resume los landmarks más usados en el código:
+            <table>
+                <tr><th>Landmark</th><th>Parte de la mano</th><th>Uso en el código</th></tr>
+                <tr><td>0</td><td>Muñeca</td><td>Base de los segmentos de palma</td></tr>
+                <tr><td>4</td><td>Punta del pulgar</td><td>Detección de gestos zoom/shaka</td></tr>
+                <tr><td>8</td><td>Punta del índice</td><td>Detectar dedo extendido/doblado</td></tr>
+                <tr><td>9</td><td>Base del dedo medio</td><td>Centro de la palma → velocidad de mano</td></tr>
+                <tr><td>12,16,20</td><td>Puntas medio/anular/meñique</td><td>Estado abierto/cerrado</td></tr>
+            </table>
+        </div>
+
+        <!-- 3.8 build_collision -->
+        <h3>3.8 Función <code>build_collision()</code> — mapa de colisiones</h3>
+        <div class="code-block">
+            <div class="code-label">fisica_camara.py — build_collision (resumido)</div>
+            <pre><span class="kw">def</span> <span class="fn">build_collision</span>(frame, hands, w, h):
+    gray  = cv2.<span class="fn">cvtColor</span>(frame, cv2.COLOR_BGR2GRAY)
+    blur  = cv2.<span class="fn">GaussianBlur</span>(gray, (<span class="nm">5</span>, <span class="nm">5</span>), <span class="nm">0</span>)
+    edges = cv2.<span class="fn">Canny</span>(blur, <span class="cl">CANNY_LO</span>, <span class="cl">CANNY_HI</span>)
+    thick = cv2.<span class="fn">dilate</span>(edges, np.<span class="fn">ones</span>((<span class="cl">EDGE_DILATE</span>, <span class="cl">EDGE_DILATE</span>)))
+    gx    = cv2.<span class="fn">Sobel</span>(gray, cv2.CV_32F, <span class="nm">1</span>, <span class="nm">0</span>, ksize=<span class="nm">3</span>)
+    gy    = cv2.<span class="fn">Sobel</span>(gray, cv2.CV_32F, <span class="nm">0</span>, <span class="nm">1</span>, ksize=<span class="nm">3</span>)
+    <span class="kw">return</span> thick, gx, gy</pre>
+        </div>
+        <div class="callout">
+            Cada fotograma construye un "mapa de colisiones" en cuatro pasos:
+            <ul>
+                <li><strong>Escala de grises</strong>: simplifica la imagen para que los algoritmos sean más rápidos.</li>
+                <li><strong>GaussianBlur</strong>: suaviza el ruido para que Canny no detecte falsos bordes.</li>
+                <li><strong>Canny</strong>: detecta los contornos de los objetos en la imagen como una máscara binaria (blanco = borde, negro = fondo).</li>
+                <li><strong>Sobel</strong>: calcula el gradiente de la imagen en X e Y para obtener la dirección normal de cada borde y así calcular el ángulo de rebote correcto.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         SECCIÓN 4: ACTIVIDADES TEÓRICAS
+    ══════════════════════════════════════════════════════ -->
+    <div class="section">
+        <div class="section-header">
+            <div class="section-num">4</div>
+            <h2>Actividades teóricas</h2>
+        </div>
+        <p>Reflexioná sobre los conceptos que usa el código y respondé cada punto con tus palabras.</p>
+
+        <div class="act-card">
+            <span class="act-type tag-teorica">Teórica 1 — POO</span>
+            <h4>Clases y objetos: Pelota y HandTracker</h4>
+            <p>El código tiene dos clases principales: <code>Pelota</code> y <code>HandTracker</code>.
+            Explicá con tus palabras qué es una clase y qué es un objeto.
+            ¿Cuántos objetos de tipo <code>Pelota</code> puede haber corriendo al mismo tiempo?
+            ¿Cada uno tiene su propio estado (posición, velocidad)?
+            ¿Por qué tiene sentido usar una clase en lugar de variables sueltas como <code>pelota_x</code>, <code>pelota_y</code>, <code>pelota_vx</code>?</p>
+        </div>
+
+        <div class="act-card">
+            <span class="act-type tag-teorica">Teórica 2 — Estructuras de datos</span>
+            <h4><code>deque</code> vs lista: ¿por qué usar una cola?</h4>
+            <p>El código usa <code>deque(maxlen=5)</code> para guardar las últimas velocidades de la mano, y <code>deque(maxlen=16)</code> para la estela de cada pelota.
+            ¿Qué diferencia hay entre una lista normal y un <code>deque</code> con <code>maxlen</code>?
+            ¿Qué pasaría si se usara una lista normal para la estela? ¿Qué problema traería con el tiempo?
+            ¿Por qué promediar los últimos 5 valores de velocidad produce un resultado más estable que usar solo el último valor?</p>
+        </div>
+
+        <div class="act-card">
+            <span class="act-type tag-teorica">Teórica 3 — Bucle principal y frames</span>
+            <h4>El bucle <code>while True</code> y la lógica de cada fotograma</h4>
+            <p>El programa corre dentro de un bucle infinito que se repite aproximadamente 30 veces por segundo.
+            En cada iteración se captura un fotograma, se construye el mapa de colisiones, se actualiza la física y se dibuja.
+            ¿Por qué se llama a <code>build_collision()</code> en cada iteración y no una sola vez al inicio?
+            ¿Qué consecuencia tendría calcular los bordes Canny con menor frecuencia (por ejemplo, una vez cada 10 frames)?</p>
+        </div>
+
+        <div class="act-card">
+            <span class="act-type tag-teorica">Teórica 4 — Modularización</span>
+            <h4>¿Por qué la detección de mano está separada en <code>mano2.py</code>?</h4>
+            <p>La clase <code>HandDetector</code> vive en un archivo separado (<code>mano2.py</code>) y es usada por <code>fisica_camara.py</code>, por <code>piano.py</code>, por <code>galax.py</code> y por otros proyectos del workspace.
+            ¿Qué ventaja da separar responsabilidades en módulos distintos?
+            ¿Qué problema habría si el código de MediaPipe estuviera mezclado directamente en el bucle principal de <code>fisica_camara.py</code>?
+            ¿Cómo se relaciona esto con el principio de <strong>responsabilidad única</strong> en programación?</p>
+        </div>
+
+        <div class="act-card">
+            <span class="act-type tag-teorica">Teórica 5 — Álgebra vectorial aplicada</span>
+            <h4>La fórmula de reflexión <code>v' = v − 2(v·n)n</code></h4>
+            <p>El método <code>_collide()</code> usa esta fórmula para calcular la dirección de rebote.
+            El símbolo <strong>·</strong> representa el producto escalar entre dos vectores.
+            ¿Qué información da el producto escalar <code>v·n</code> en este contexto?
+            Si la pelota choca contra una pared perfectamente vertical (normal apuntando hacia la derecha), ¿cómo cambia la velocidad?
+            ¿Por qué se necesita la normal de la superficie y no alcanza con invertir directamente <code>vx</code> o <code>vy</code>?</p>
+        </div>
+
+        <div class="act-card">
+            <span class="act-type tag-teorica">Teórica 6 — Landmarks y lógica booleana</span>
+            <h4>Detección de gestos en <code>mano2.py</code></h4>
+            <p>Los métodos <code>is_hand_closed()</code> e <code>is_hand_open()</code> comparan coordenadas Y de landmarks para detectar si un dedo está doblado o estirado.
+            ¿Por qué se compara la coordenada Y de la punta con la de la segunda articulación (tip vs tip-2)?
+            ¿Por qué se usa el umbral "3 o más dedos" en lugar de exigir que los 4 estén cerrados?
+            ¿Qué limitación tiene este enfoque si la mano está de costado frente a la cámara?</p>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         SECCIÓN 5: ACTIVIDAD PRÁCTICA
+    ══════════════════════════════════════════════════════ -->
+    <div class="section">
+        <div class="section-header">
+            <div class="section-num">5</div>
+            <h2>Actividad práctica: agarrar la pelota cerrando la mano</h2>
+        </div>
+        <p>
+            Actualmente la mano empuja las pelotas pero no las puede agarrar.
+            La idea es que si la mano está abierta y se cierra <em>encima</em> de una pelota, la pelota quede
+            "pegada" a la palma hasta que la mano vuelva a abrirse y la suelte con la velocidad que traía.
+        </p>
+
+        <h3>¿Cómo implementarlo? — Guía conceptual</h3>
+        <div class="callout">
+            <strong>Estado que necesitamos agregar a la clase <code>Pelota</code>:</strong>
+            <ul>
+                <li><code>grabbed</code>: booleano que indica si la pelota está siendo sostenida.</li>
+                <li><code>grab_offset_x</code>, <code>grab_offset_y</code>: distancia entre el centro de la palma y el centro de la pelota al momento de agarrarla (para que no "salte" al posicionarse).</li>
+            </ul>
+            <strong>Lógica en el bucle principal:</strong>
+            <ul>
+                <li>Si la mano se <em>cierra</em> (<code>is_hand_closed()</code>) y el centro de la palma está cerca de la pelota → marcar <code>grabbed = True</code> y guardar el offset.</li>
+                <li>Mientras <code>grabbed == True</code>: en vez de aplicar física, mover la pelota a <code>palma_x + offset_x</code>, <code>palma_y + offset_y</code>. Resetear <code>vx = vy = 0</code>.</li>
+                <li>Si la mano se <em>abre</em> (<code>is_hand_open()</code>): marcar <code>grabbed = False</code> y asignar a la pelota la velocidad de la mano (<code>hvx</code>, <code>hvy</code>) para que salga volando.</li>
+            </ul>
+        </div>
+
+        <h3>Código sugerido — modificaciones necesarias</h3>
+        <div class="code-block">
+            <div class="code-label">fisica_camara.py — agregar en la clase Pelota</div>
+            <pre><span class="kw">class</span> <span class="cl">Pelota</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="sf">self</span>, x, y):
+        <span class="sf">self</span>.x  = <span class="fn">float</span>(x)
+        <span class="sf">self</span>.y  = <span class="fn">float</span>(y)
+        <span class="sf">self</span>.vx = random.<span class="fn">uniform</span>(-<span class="nm">5.0</span>, <span class="nm">5.0</span>)
+        <span class="sf">self</span>.vy = random.<span class="fn">uniform</span>(-<span class="nm">6.0</span>, -<span class="nm">1.0</span>)
+        <span class="sf">self</span>.color = random.<span class="fn">choice</span>(COLORS)
+        <span class="sf">self</span>.trail: deque = <span class="fn">deque</span>(maxlen=TRAIL_LEN)
+        <span class="cm"># --- NUEVO: estado de agarre ---</span>
+        <span class="sf">self</span>.grabbed        = <span class="nm">False</span>
+        <span class="sf">self</span>.grab_offset_x  = <span class="nm">0.0</span>
+        <span class="sf">self</span>.grab_offset_y  = <span class="nm">0.0</span>
+
+    <span class="kw">def</span> <span class="fn">try_grab</span>(<span class="sf">self</span>, palm_x: float, palm_y: float):
+        <span class="st">"""Intenta agarrar la pelota si la palma está encima."""</span>
+        dist = np.<span class="fn">hypot</span>(<span class="sf">self</span>.x - palm_x, <span class="sf">self</span>.y - palm_y)
+        <span class="kw">if</span> dist < <span class="cl">BALL_RADIUS</span> + <span class="nm">30</span>:   <span class="cm"># 30 px de margen de agarre</span>
+            <span class="sf">self</span>.grabbed       = <span class="nm">True</span>
+            <span class="sf">self</span>.grab_offset_x = <span class="sf">self</span>.x - palm_x
+            <span class="sf">self</span>.grab_offset_y = <span class="sf">self</span>.y - palm_y
+
+    <span class="kw">def</span> <span class="fn">release</span>(<span class="sf">self</span>, hvx: float, hvy: float):
+        <span class="st">"""Suelta la pelota con la velocidad de la mano."""</span>
+        <span class="sf">self</span>.grabbed = <span class="nm">False</span>
+        <span class="sf">self</span>.vx = hvx
+        <span class="sf">self</span>.vy = hvy
+
+    <span class="kw">def</span> <span class="fn">step</span>(<span class="sf">self</span>, h, w, thick, gx_map, gy_map, palm_x=<span class="nm">None</span>, palm_y=<span class="nm">None</span>):
+        <span class="kw">if</span> <span class="sf">self</span>.grabbed <span class="kw">and</span> palm_x <span class="kw">is not</span> <span class="nm">None</span>:
+            <span class="cm"># Pelota sigue la palma con el offset original</span>
+            <span class="sf">self</span>.x = palm_x + <span class="sf">self</span>.grab_offset_x
+            <span class="sf">self</span>.y = palm_y + <span class="sf">self</span>.grab_offset_y
+            <span class="sf">self</span>.vx = <span class="sf">self</span>.vy = <span class="nm">0.0</span>
+            <span class="sf">self</span>.trail.<span class="fn">append</span>((<span class="fn">int</span>(<span class="sf">self</span>.x), <span class="fn">int</span>(<span class="sf">self</span>.y)))
+            <span class="kw">return</span>
+        <span class="cm"># ... resto de la física original sin cambios ...</span></pre>
+        </div>
+        <div class="code-block">
+            <div class="code-label">fisica_camara.py — integración en el bucle principal</div>
+            <pre><span class="cm"># Dentro del while True, después de obtener la mano:</span>
+hand_closed = detector.<span class="fn">is_hand_closed</span>(hand)
+hand_open   = detector.<span class="fn">is_hand_open</span>(hand)
+palm_x = hand[<span class="nm">9</span>].x * w
+palm_y = hand[<span class="nm">9</span>].y * h
+
+<span class="kw">for</span> ball <span class="kw">in</span> balls:
+    <span class="kw">if</span> hand_closed <span class="kw">and not</span> ball.grabbed:
+        ball.<span class="fn">try_grab</span>(palm_x, palm_y)
+    <span class="kw">elif</span> hand_open <span class="kw">and</span> ball.grabbed:
+        ball.<span class="fn">release</span>(hand_tracker.vx, hand_tracker.vy)
+
+    ball.<span class="fn">step</span>(h, w, thick, gx_map, gy_map,
+               palm_x=palm_x <span class="kw">if</span> ball.grabbed <span class="kw">else</span> <span class="nm">None</span>,
+               palm_y=palm_y <span class="kw">if</span> ball.grabbed <span class="kw">else</span> <span class="nm">None</span>)</pre>
+        </div>
+        <div class="callout">
+            <strong>Puntos clave para reflexionar al implementar esto:</strong>
+            <ul>
+                <li>¿Qué pasa si hay múltiples pelotas y la mano cierra sobre varias a la vez? ¿Se agarran todas o solo la más cercana?</li>
+                <li>¿Por qué guardar el offset en el momento de agarre en lugar de siempre centrar la pelota en la palma?</li>
+                <li>¿Qué sucede si la mano sale del cuadro de la cámara mientras tiene una pelota agarrada?</li>
+            </ul>
+        </div>
+    </div>
+
+</div>
+
+<footer>
+    Proyecto: fisica_camara.py — Cátedra de Programación &nbsp;|&nbsp; Guía generada para defensa del proyecto
+</footer>
+
+</body>
+</html>

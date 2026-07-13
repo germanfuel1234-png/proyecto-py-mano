@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Respuestas teóricas — fisica_camara.py</title>
+    <style>
+        body { background: #181c24; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 0 0 3rem 0; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+        h1 { color: #6c63ff; font-size: 2.1rem; margin-bottom: 1.2rem; }
+        h2 { color: #00d4ff; font-size: 1.2rem; margin-top: 2.2rem; margin-bottom: 0.7rem; }
+        .resp { background: #23263a; border-left: 4px solid #6c63ff; border-radius: 0 10px 10px 0; padding: 1.1rem 1.3rem; margin-bottom: 1.5rem; }
+        .resp strong { color: #ffd166; }
+        code { background: #23263a; color: #00d4ff; padding: 0.1em 0.4em; border-radius: 4px; font-size: 0.98em; }
+        ul { margin: 0.7em 0 0.7em 1.5em; }
+        li { margin-bottom: 0.3em; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Respuestas teóricas — fisica_camara.py</h1>
+
+    <h2>Teórica 1 — POO: Clases y objetos</h2>
+    <div class="resp">
+        <strong>¿Qué es una clase y qué es un objeto?</strong><br>
+        Una <strong>clase</strong> es una plantilla que define cómo es y cómo se comporta un tipo de dato. Un <strong>objeto</strong> es una instancia concreta de esa clase, con sus propios valores.<br><br>
+        <strong>¿Cuántos objetos de tipo Pelota puede haber?</strong><br>
+        Puede haber hasta 30 pelotas (por <code>MAX_BALLS</code>), cada una con su propia posición, velocidad y color.<br><br>
+        <strong>¿Por qué usar clases?</strong><br>
+        Usar clases permite crear múltiples pelotas independientes, cada una con su propio estado y métodos. Si usáramos variables sueltas, el código sería mucho más difícil de mantener y escalar.
+    </div>
+
+    <h2>Teórica 2 — Estructuras de datos: deque vs lista</h2>
+    <div class="resp">
+        <strong>¿Diferencia entre lista y deque con maxlen?</strong><br>
+        <code>deque(maxlen=5)</code> es una cola de tamaño fijo: cuando se agregan más de 5 elementos, el más antiguo se elimina automáticamente. Una lista normal crecería indefinidamente.<br><br>
+        <strong>¿Qué pasaría si se usara lista?</strong><br>
+        Si se usara una lista para la estela, con el tiempo ocuparía mucha memoria y sería más lento recorrerla.<br><br>
+        <strong>¿Por qué promediar los últimos 5 valores?</strong><br>
+        Promediar suaviza la velocidad y evita saltos bruscos por errores de detección o movimientos rápidos.
+    </div>
+
+    <h2>Teórica 3 — Bucle principal y frames</h2>
+    <div class="resp">
+        <strong>¿Por qué llamar a build_collision() en cada iteración?</strong><br>
+        Porque la imagen de la cámara cambia todo el tiempo: los objetos pueden moverse, aparecer o desaparecer. Si solo se calculara una vez, la pelota no rebotaría en nuevos objetos.<br><br>
+        <strong>¿Qué pasa si se calcula Canny menos seguido?</strong><br>
+        Habría un retraso en la detección de nuevos bordes y la física sería menos precisa, especialmente si los objetos se mueven rápido.
+    </div>
+
+    <h2>Teórica 4 — Modularización</h2>
+    <div class="resp">
+        <strong>¿Ventaja de separar en módulos?</strong><br>
+        Permite reutilizar la clase <code>HandDetector</code> en otros proyectos y facilita el mantenimiento. Si todo estuviera mezclado, sería más difícil de entender y modificar.<br><br>
+        <strong>¿Relación con responsabilidad única?</strong><br>
+        Cada módulo tiene una única responsabilidad: <code>mano2.py</code> se encarga de la mano, <code>fisica_camara.py</code> de la física y la interfaz.
+    </div>
+
+    <h2>Teórica 5 — Álgebra vectorial aplicada</h2>
+    <div class="resp">
+        <strong>¿Qué mide el producto escalar v·n?</strong><br>
+        Mide cuánto de la velocidad de la pelota va en dirección perpendicular a la superficie. Si es cero, la pelota se mueve paralelo al borde y no rebota.<br><br>
+        <strong>¿Por qué usar la normal?</strong><br>
+        Porque permite calcular el rebote correcto en cualquier ángulo, no solo en superficies horizontales o verticales. Invertir solo <code>vx</code> o <code>vy</code> solo sirve para paredes perfectamente alineadas.<br><br>
+        <strong>Ejemplo:</strong> Si la normal apunta a la derecha, al chocar la pelota invierte su velocidad horizontal y mantiene la vertical.
+    </div>
+
+    <h2>Teórica 6 — Landmarks y lógica booleana</h2>
+    <div class="resp">
+        <strong>¿Por qué comparar tip vs tip-2?</strong><br>
+        Porque así se detecta si el dedo está doblado (la punta está más abajo que la articulación) o estirado.<br><br>
+        <strong>¿Por qué 3 o más dedos?</strong><br>
+        Para tolerar pequeños errores de detección y que el gesto sea más robusto.<br><br>
+        <strong>¿Limitación si la mano está de costado?</strong><br>
+        El algoritmo puede fallar porque los landmarks pueden superponerse o no reflejar bien la posición real de los dedos.
+    </div>
+</div>
+</body>
+</html>

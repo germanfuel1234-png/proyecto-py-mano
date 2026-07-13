@@ -1,0 +1,299 @@
+###############################################################
+# galax.py
+# Sistema solar animado en 3D con Vispy
+# Mejorado: órbitas separadas, esferas suaves, colores vivos, luna, rotación propia, iluminación simple, etiquetas
+###############################################################
+
+import numpy as np
+from vispy import app, scene, color
+from vispy.scene.visuals import Mesh
+from vispy.visuals.filters import TextureFilter
+from vispy.scene import visuals
+from PIL import Image
+
+# --- Función para cargar texturas RGBA ---
+def cargar_textura(path):
+    try:
+        img = Image.open(path)
+        img = img.convert('RGBA')
+        data = np.array(img).astype(np.float32) / 255.0
+        if data.shape[2] != 4:
+            raise ValueError("La textura debe tener 4 canales (RGBA)")
+        return data
+    except Exception as e:
+        print(f"No se pudo cargar la textura {path}: {e}")
+        return None
+
+# Diccionario de texturas por planeta y objetos (nombres simplificados y en mayúsculas)
+TEXTURAS_PLANETAS = {
+    "Mercurio": "texturas/MERCURIO.jpg",
+    "Venus": "texturas/VENUS_SUPERFICIE.jpg",
+    "Tierra": "texturas/TIERRA.jpg",
+    "Marte": "texturas/MARTE.jpg",
+    "Júpiter": "texturas/JUPITER.jpg",
+    "Saturno": "texturas/SATURNO.jpg",
+    "Urano": "texturas/URANIO.jpg",
+    "Neptuno": "texturas/NEPTUNO.jpg"
+}
+TEXTURA_LUNA = "texturas/LUNA.jpg"
+TEXTURA_SOL = "texturas/SOL.jpg"
+TEXTURA_ATMOSFERA = "texturas/VENUS_ATMOSFERA.jpg"
+TEXTURA_ESTRELLAS = "texturas/2k_stars_milky_way.jpg"
+
+# FUNCIÓN PARA CREAR UNA ESFERA TEXTURIZADA COMO MESH
+
+def crear_esfera_texturizada(centro, radio, filas=32, columnas=64):
+    """
+    Genera una esfera como mesh con texcoords para texturizado UV.
+    centro: (x, y, z)
+    radio: float
+    filas: int (latitudes)
+    columnas: int (longitudes)
+    """
+    vertices = []
+    texcoords = []
+    indices = []
+    for i in range(filas + 1):
+        lat = np.pi * i / filas
+        for j in range(columnas + 1):
+            lon = 2 * np.pi * j / columnas
+            x = radio * np.sin(lat) * np.cos(lon) + centro[0]
+            y = radio * np.cos(lat) + centro[1]
+            z = radio * np.sin(lat) * np.sin(lon) + centro[2]
+            vertices.append([x, y, z])
+            u = j / columnas
+            v = i / filas
+            texcoords.append([u, 1 - v])
+    for i in range(filas):
+        for j in range(columnas):
+            p1 = i * (columnas + 1) + j
+            p2 = p1 + columnas + 1
+            indices.append([p1, p2, p1 + 1])
+            indices.append([p2, p2 + 1, p1 + 1])
+    return np.array(vertices, np.float32), np.array(indices, np.uint32), np.array(texcoords, np.float32)
+
+# --- Parámetros de los planetas ---
+PLANETAS = [
+    # nombre, radio órbita, radio planeta, color, velocidad angular, inclinación orbital (grados), rotación propia
+    ("Mercurio", 3, 0.18, '#b1b1b1', 0.04, 7, 0.03),
+    ("Venus",    4.5, 0.25, '#e0c16d', 0.03, 3.4, 0.02),
+    ("Tierra",   6, 0.28, '#3d7ee6', 0.025, 0, 0.04),
+    ("Marte",    7.5, 0.22, '#c1440e', 0.02, 1.85, 0.038),
+    ("Júpiter",  10, 0.6, '#e3d9b5', 0.008, 1.3, 0.1),
+    ("Saturno",  12, 0.5, '#f7e7b3', 0.006, 2.5, 0.09),
+    ("Urano",    14, 0.38, '#7fffd4', 0.004, 0.8, 0.07),
+    ("Neptuno",  16, 0.36, '#6f42c1', 0.003, 1.8, 0.08)
+]
+
+# --- Ventana Vispy ---
+canvas = scene.SceneCanvas(keys='interactive', show=True, bgcolor='black', size=(1200, 900))
+view = canvas.central_widget.add_view()
+view.camera = scene.cameras.TurntableCamera(fov=60, azimuth=0, elevation=30, distance=45)
+
+
+# --- Sol con textura ---
+vertices_sol, indices_sol, texcoords_sol = crear_esfera_texturizada((0, 0, 0), 1.2)
+sol = Mesh(vertices=vertices_sol, faces=indices_sol, color='#ffe066', parent=view.scene)
+sol_tex = cargar_textura(TEXTURA_SOL)
+if sol_tex is not None:
+    try:
+        sol.attach(TextureFilter(sol_tex, texcoords_sol))
+    except Exception as err:
+        print(f"Error aplicando textura al Sol: {err}")
+
+
+# --- Función para cargar texturas RGBA ---
+def cargar_textura(path):
+    try:
+        img = Image.open(path)
+        img = img.convert('RGBA')
+        data = np.array(img).astype(np.float32) / 255.0
+        if data.shape[2] != 4:
+            raise ValueError("La textura debe tener 4 canales (RGBA)")
+        return data
+    except Exception as e:
+        print(f"No se pudo cargar la textura {path}: {e}")
+        return None
+
+
+
+# --- Planetas y órbitas ---
+planetas_vispy = []
+etiquetas = []
+lunas = []
+
+# --- Planetas y órbitas ---
+planetas_vispy = []
+etiquetas = []
+lunas = []
+atm_idx = None
+for i, (nombre, radio, radio_planeta, color_hex, _, inclinacion, _) in enumerate(PLANETAS):
+    # Crear mesh con textura
+    vertices, indices, texcoords = crear_esfera_texturizada((0, 0, 0), radio_planeta)
+    color_planeta = color.Color(color_hex)
+    if nombre == "Tierra":
+        color_planeta = (1, 1, 1, 1)
+    planeta = Mesh(vertices=vertices, faces=indices, color=color_planeta, parent=view.scene)
+    tex_path = TEXTURAS_PLANETAS.get(nombre, None)
+    if tex_path:
+        tex_data = cargar_textura(tex_path)
+        if tex_data is not None:
+            if nombre == "Tierra" and tex_data.shape[2] == 4:
+                tex_data[..., 3] = 1.0
+            try:
+                planeta.attach(TextureFilter(tex_data, texcoords))
+            except Exception as err:
+                print(f"Error aplicando textura al planeta {nombre}: {err}")
+    planetas_vispy.append(planeta)
+    # Órbita
+    t = np.linspace(0, 2 * np.pi, 200)
+    x = radio * np.cos(t)
+    y = radio * np.sin(t)
+    z = np.zeros_like(t)
+    rot = np.deg2rad(inclinacion)
+    z = y * np.sin(rot)
+    y = y * np.cos(rot)
+    orbit = visuals.Line(pos=np.c_[x, y, z], color=(0.7, 0.7, 0.7, 0.5), parent=view.scene, width=2)
+    # Etiqueta
+    label = visuals.Text(nombre, color='white', font_size=18, bold=True, parent=view.scene, anchor_x='center', anchor_y='bottom')
+    etiquetas.append(label)
+    # Luna para la Tierra
+    if nombre == "Tierra":
+        vertices_luna, indices_luna, texcoords_luna = crear_esfera_texturizada((0, 0, 0), 0.08)
+        luna = Mesh(vertices=vertices_luna, faces=indices_luna, color='#cccccc', parent=view.scene)
+        luna_tex = cargar_textura(TEXTURA_LUNA)
+        if luna_tex is not None:
+            try:
+                luna.attach(TextureFilter(luna_tex, texcoords_luna))
+            except Exception as err:
+                print(f"Error aplicando textura a la luna: {err}")
+        lunas.append(luna)
+    else:
+        lunas.append(None)
+
+# Atmósfera semitransparente para Venus (se agrega al final, fuera del ciclo principal)
+if any(nombre == "Venus" for nombre, *_ in PLANETAS):
+    idx_venus = [i for i, (nombre, *_rest) in enumerate(PLANETAS) if nombre == "Venus"][0]
+    radio_venus = PLANETAS[idx_venus][2]
+    vertices_atm, indices_atm, texcoords_atm = crear_esfera_texturizada((0, 0, 0), radio_venus * 1.05)
+    atmosfera = Mesh(vertices=vertices_atm, faces=indices_atm, color=(1,1,1,0.4), parent=view.scene)
+    atm_tex = cargar_textura(TEXTURA_ATMOSFERA)
+    if atm_tex is not None:
+        try:
+            atmosfera.attach(TextureFilter(atm_tex, texcoords_atm))
+        except Exception as err:
+            print(f"Error aplicando textura a la atmósfera de Venus: {err}")
+    atmosfera.set_gl_state('translucent', depth_test=True)
+    planetas_vispy.append(atmosfera)  # Siempre al final
+
+# --- Esfera de estrellas (solo visible cuando la cámara está lejos) ---
+vertices_fondo, indices_fondo, texcoords_fondo = crear_esfera_texturizada((0, 0, 0), 40)
+fondo = Mesh(vertices=vertices_fondo, faces=indices_fondo, color=(1,1,1,1), parent=view.scene)
+fondo_tex = cargar_textura(TEXTURA_ESTRELLAS)
+if fondo_tex is not None:
+    try:
+        fondo.attach(TextureFilter(fondo_tex, texcoords_fondo))
+    except Exception as err:
+        print(f"Error aplicando textura al fondo de estrellas: {err}")
+fondo.set_gl_state('translucent', depth_test=False, cull_face='front')
+# --- Aros de Saturno (disco con textura alfa) ---
+def crear_disco_texturizado(radio_ext=1.1, radio_int=0.5, segmentos=128, z=0):
+    vertices = []
+    texcoords = []
+    faces = []
+    for i in range(segmentos+1):
+        theta = 2 * np.pi * i / segmentos
+        x_ext = radio_ext * np.cos(theta)
+        y_ext = radio_ext * np.sin(theta)
+        x_int = radio_int * np.cos(theta)
+        y_int = radio_int * np.sin(theta)
+        vertices.append([x_ext, y_ext, z])
+        texcoords.append([0.5 + 0.5 * np.cos(theta), 0.5 + 0.5 * np.sin(theta)])
+        vertices.append([x_int, y_int, z])
+        texcoords.append([0.5 + 0.5 * np.cos(theta) * radio_int/radio_ext, 0.5 + 0.5 * np.sin(theta) * radio_int/radio_ext])
+    for i in range(segmentos):
+        faces.append([i*2, i*2+1, (i*2+2)%((segmentos+1)*2)])
+        faces.append([i*2+1, (i*2+3)%((segmentos+1)*2), (i*2+2)%((segmentos+1)*2)])
+    return np.array(vertices, np.float32), np.array(faces, np.uint32), np.array(texcoords, np.float32)
+
+saturno_ring_tex = cargar_textura('texturas/2k_saturn_ring_alpha.png')
+saturno_ring = None
+saturno_ring_idx = None
+for i, (nombre, radio, radio_planeta, color_hex, _, inclinacion, _) in enumerate(PLANETAS):
+    if nombre == "Saturno" and saturno_ring_tex is not None:
+        vertices_ring, faces_ring, texcoords_ring = crear_disco_texturizado(radio_ext=radio_planeta*2.2, radio_int=radio_planeta*1.2, z=0)
+        saturno_ring = Mesh(vertices=vertices_ring, faces=faces_ring, color=(1,1,1,1), parent=view.scene)
+        try:
+            saturno_ring.attach(TextureFilter(saturno_ring_tex, texcoords_ring))
+        except Exception as err:
+            print(f"Error aplicando textura a los aros de Saturno: {err}")
+        saturno_ring.set_gl_state('translucent', depth_test=True)
+        saturno_ring_idx = i
+        break
+
+# --- Iluminación simple (simulada con color) ---
+def iluminar(color_hex, factor):
+    c = color.Color(color_hex).rgb
+    c = np.clip(np.array(c) * factor, 0, 1)
+    return c
+
+
+
+# --- Animación ---
+angle = 0
+
+
+def update(event):
+    global angle
+    angle += 0.01
+    for i, (nombre, radio, radio_planeta, color_hex, vel, inclinacion, rotacion) in enumerate(PLANETAS):
+        orb_angle = angle * vel + i * 0.7
+        x = radio * np.cos(orb_angle)
+        y = radio * np.sin(orb_angle)
+        rot = np.deg2rad(inclinacion)
+        z = y * np.sin(rot)
+        y = y * np.cos(rot)
+        planeta_rot = scene.transforms.MatrixTransform()
+        planeta_rot.rotate(angle * rotacion * 360, (0, 1, 0))
+        planeta_rot.translate((x, y, z))
+        planetas_vispy[i].transform = planeta_rot
+        if nombre == "Venus":
+            atm_idx = len(PLANETAS)
+            if len(planetas_vispy) > atm_idx:
+                atmosfera_rot = scene.transforms.MatrixTransform()
+                atmosfera_rot.rotate(angle * rotacion * 360, (0, 1, 0))
+                atmosfera_rot.translate((x, y, z))
+                planetas_vispy[atm_idx].transform = atmosfera_rot
+        etiquetas[i].pos = (x, y, z + radio_planeta + 0.2)
+        if nombre == "Tierra":
+            luna_angle = angle * 0.08 * 30
+            lx = x + 0.5 * np.cos(luna_angle)
+            ly = y + 0.5 * np.sin(luna_angle)
+            lz = z
+            luna_rot = scene.transforms.MatrixTransform()
+            luna_rot.rotate(angle * 0.2 * 360, (0, 1, 0))
+            luna_rot.translate((lx, ly, lz))
+            lunas[i].transform = luna_rot
+        if nombre == "Saturno" and saturno_ring is not None:
+            ring_rot = scene.transforms.MatrixTransform()
+            ring_rot.rotate(angle * rotacion * 360, (0, 1, 0))
+            ring_rot.translate((x, y, z))
+            saturno_ring.transform = ring_rot
+        if hasattr(view, 'camera') and hasattr(view.camera, 'distance'):
+            if view.camera.distance > 30:
+                fondo.visible = True
+            else:
+                fondo.visible = False
+        else:
+            fondo.visible = True
+
+# Timer para refrescar la escena y leer la cámara
+timer = app.Timer()
+timer.connect(update)
+timer.start(0.03)
+
+if __name__ == '__main__':
+    app.run()
+
+# Exponer view para control externo
+__all__ = ["view"]

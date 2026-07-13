@@ -1,0 +1,9 @@
+python main.py
+
+.\venv\Scripts\activate
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+
+pip install numpy mediapipe vispy opencv-python
+
+https://www.solarsystemscope.com/textures/

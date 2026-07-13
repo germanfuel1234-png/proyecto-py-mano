@@ -1,0 +1,300 @@
+# --- Filtro de suavizado para la punta del índice ---
+from collections import deque
+suavizado_ix = deque(maxlen=5)
+suavizado_iy = deque(maxlen=5)
+# --- Sistema de partículas (chispas doradas) ---
+import random
+class Chispa:
+    def __init__(self, x, y):
+        ang = np.random.uniform(0, 2*np.pi)
+        dist = np.random.uniform(30, 60)  # distancia máxima focalizada (doble)
+        self.vx = np.cos(ang) * dist / 8.0  # velocidad para llegar a ~60px en 0.3s
+        self.vy = np.sin(ang) * dist / 8.0
+        self.x = x
+        self.y = y
+        self.t0 = time.time()
+        self.duracion = 0.18 + np.random.uniform(0, 0.12)  # más corto, máximo 0.3s
+        self.size = np.random.randint(2, 4)
+        self.color = (0, 215, 255)
+        self.max_dist = dist
+        self.distancia = 0
+    def vivo(self):
+        return (time.time() - self.t0) < self.duracion and self.distancia < self.max_dist
+    def alpha(self):
+        return max(0, 1 - (time.time() - self.t0)/self.duracion)
+    def step(self):
+        self.x += self.vx
+        self.y += self.vy
+        self.distancia += np.sqrt(self.vx**2 + self.vy**2)
+
+chispas = []
+import cv2
+import numpy as np
+from mano2 import HandDetector
+import time
+
+
+# Tamaño del lienzo interno (pizarra)
+CANVAS_WIDTH, CANVAS_HEIGHT = 2400, 1600
+# Tamaño de la ventana de visualización
+WIDTH, HEIGHT = 800, 400
+
+# Inicializar pizarra negra (lienzo grande)
+pizarra = np.zeros((CANVAS_HEIGHT, CANVAS_WIDTH, 3), dtype=np.uint8)
+
+brillo_img = cv2.imread('brillo.jpg', cv2.IMREAD_UNCHANGED)  # Puede ser RGBA o RGB
+if brillo_img is not None and brillo_img.shape[2] == 3:
+    # Si es JPG, no tiene canal alpha, lo convertimos a BGRA con alpha 255
+    brillo_img = cv2.cvtColor(brillo_img, cv2.COLOR_BGR2BGRA)
+
+def overlay_brillo(fondo, brillo_img, centro, escala=1.0):
+    # Centra y superpone la textura brillo_img sobre fondo en la posición centro (x, y)
+    h_b, w_b = brillo_img.shape[:2]
+    new_w = int(w_b * escala)
+    new_h = int(h_b * escala)
+    brillo_resized = cv2.resize(brillo_img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    x, y = centro
+    x0 = int(x - new_w // 2)
+    y0 = int(y - new_h // 2)
+    # Recorta si se sale de la imagen
+    x1 = max(x0, 0)
+    y1 = max(y0, 0)
+    x2 = min(x0 + new_w, fondo.shape[1])
+    y2 = min(y0 + new_h, fondo.shape[0])
+    bx1 = x1 - x0
+    by1 = y1 - y0
+    bx2 = bx1 + (x2 - x1)
+    by2 = by1 + (y2 - y1)
+    if x2 > x1 and y2 > y1:
+        roi = fondo[y1:y2, x1:x2]
+        brillo_roi = brillo_resized[by1:by2, bx1:bx2]
+        alpha = brillo_roi[..., 3:4] / 255.0
+        roi[:] = (roi * (1 - alpha) + brillo_roi[..., :3] * alpha).astype(np.uint8)
+
+# Variables de cámara y gestos
+cap = cv2.VideoCapture(0)
+detector = HandDetector()
+last_hand_pos = None
+zoom = 1.0
+zoom_activo = False
+zoom_dist_inicial = None
+zoom_inicial = 1.0
+pan_x, pan_y = 0, 0
+y_inicial_zoom = None
+pan_activo = False
+pan_x_inicial = 0
+pan_y_inicial = 0
+mano_x_inicial = 0
+mano_y_inicial = 0
+zoom_inicial = 1.0
+
+brillo_activo = False
+brillo_pos = None
+brillo_time = 0
+
+def clamp(val, minval, maxval):
+    return max(minval, min(val, maxval))
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+    frame = cv2.flip(frame, 1)
+    h, w, _ = frame.shape
+    hand_landmarks_list = detector.detectar_mano(frame)
+    hand_landmarks = hand_landmarks_list[0] if hand_landmarks_list else None
+
+    modo_dibujo = False
+    punto_dibujo = None
+    ultimo_punto_dibujo = None  # Para líneas continuas
+
+    if hand_landmarks:
+        frame = detector.dibujar_mano(frame, hand_landmarks)
+        cx = int(hand_landmarks[0].x * w)
+        cy = int(hand_landmarks[0].y * h)
+
+        # --- ZOOM SOLO CON GESTO DE PINZA Y MOVIMIENTO VERTICAL ---
+        if detector.is_zoom_start(hand_landmarks):
+            if not zoom_activo:
+                y_inicial_zoom = cy
+                zoom_inicial = zoom
+                zoom_activo = True
+            else:
+                # Mientras mantienes la pinza, ajusta el zoom según el movimiento vertical
+                delta_y = y_inicial_zoom - cy  # Subir mano: delta positivo
+                factor = 1 + (delta_y / 400.0)  # Sensibilidad: 400 píxeles = 100% zoom extra
+                zoom = clamp(zoom_inicial * factor, 0.3, 3.0)
+            pan_activo = False  # No pan mientras haces zoom
+        elif zoom_activo:
+            zoom_activo = False
+            y_inicial_zoom = None
+
+        # Prioridad: ZOOM > DIBUJO > PAN
+        # Dibujo si el índice está completamente estirado y no hay zoom
+        if (
+            detector.is_index_click(hand_landmarks)
+            and not detector.is_zoom_start(hand_landmarks)
+        ):
+            modo_dibujo = True
+            # Obtener la posición del dedo índice en píxeles de la ventana de visualización
+            ix_vis = int(hand_landmarks[8].x * WIDTH)
+            iy_vis = int(hand_landmarks[8].y * HEIGHT)
+            # Mapear esa posición al lienzo grande considerando pan y zoom
+            ix = int((ix_vis + pan_x) / zoom)
+            iy = int((iy_vis + pan_y) / zoom)
+            punto_dibujo = (ix, iy)
+            pan_activo = False  # No pan mientras dibujas
+        # Pan solo si la mano está cerrada, sin pinza ni índice extendido
+        elif (
+            detector.is_hand_closed(hand_landmarks)
+            and not detector.is_zoom_start(hand_landmarks)
+            and not detector.is_index_click(hand_landmarks)
+        ):
+            if not pan_activo:
+                mano_x_inicial = cx
+                mano_y_inicial = cy
+                pan_x_inicial = pan_x
+                pan_y_inicial = pan_y
+                pan_activo = True
+                ultimo_punto_dibujo = None  # No trazo fantasma al volver a pan
+            else:
+                dx = cx - mano_x_inicial
+                dy = cy - mano_y_inicial
+                # Limitar pan para no salir de la pizarra
+                pan_x = pan_x_inicial - dx
+                pan_y = pan_y_inicial - dy
+                # Calcular límites máximos según el zoom
+                vis_w = int(CANVAS_WIDTH * zoom)
+                vis_h = int(CANVAS_HEIGHT * zoom)
+                pan_x = clamp(pan_x, 0, max(0, vis_w - WIDTH))
+                pan_y = clamp(pan_y, 0, max(0, vis_h - HEIGHT))
+        else:
+            if pan_activo:
+                pan_activo = False
+
+    # Dibujo en la pizarra (línea continua)
+    mira_punto = None
+    # Mostrar siempre la mira en la posición donde se dibujaría si se extendiera el dedo
+    if hand_landmarks:
+        # Obtener la posición del dedo índice en la ventana de visualización
+        ix_vis = int(hand_landmarks[8].x * WIDTH)
+        iy_vis = int(hand_landmarks[8].y * HEIGHT)
+        # Mapear esa posición al lienzo grande considerando pan y zoom
+        ix = int((ix_vis + pan_x) / zoom)
+        iy = int((iy_vis + pan_y) / zoom)
+        x = clamp(ix, 0, CANVAS_WIDTH - 1)
+        y = clamp(iy, 0, CANVAS_HEIGHT - 1)
+        mira_punto = (x, y)
+
+    if modo_dibujo and punto_dibujo and hand_landmarks is not None:
+        # Filtro de suavizado para la punta del índice
+        suavizado_ix.append(punto_dibujo[0])
+        suavizado_iy.append(punto_dibujo[1])
+        x = int(np.mean(suavizado_ix))
+        y = int(np.mean(suavizado_iy))
+        # Limitar el trazo dentro de la pizarra grande
+        x = clamp(x, 0, CANVAS_WIDTH - 1)
+        y = clamp(y, 0, CANVAS_HEIGHT - 1)
+        if 0 <= x < CANVAS_WIDTH and 0 <= y < CANVAS_HEIGHT:
+            # Interpolación de puntos para trazo continuo (cada 1px)
+            if ultimo_punto_dibujo is not None:
+                x0, y0 = ultimo_punto_dibujo
+                dist = np.hypot(x - x0, y - y0)
+                pasos = max(1, int(dist))  # cada 1 px
+                for i in range(1, pasos + 1):
+                    xi = int(x0 + (x - x0) * i / pasos)
+                    yi = int(y0 + (y - y0) * i / pasos)
+                    # --- Efecto glow dorado ---
+                    for r, alpha, color in [
+                        (14, 0.10, (0, 215, 255)),
+                        (9, 0.18, (0, 215, 255)),
+                        (6, 0.28, (0, 215, 255))]:
+                        overlay = pizarra.copy()
+                        cv2.line(overlay, (x0, y0), (xi, yi), color, r)
+                        cv2.addWeighted(overlay, alpha, pizarra, 1 - alpha, 0, pizarra)
+                    # Borde neón (celeste)
+                    cv2.line(pizarra, (x0, y0), (xi, yi), (255, 255, 100), 8)
+                    # Centro blanco brillante
+                    cv2.line(pizarra, (x0, y0), (xi, yi), (255,255,255), 4)
+                    x0, y0 = xi, yi
+            else:
+                # Efecto glow para punto inicial
+                for r, alpha, color in [
+                    (14, 0.10, (0, 215, 255)),
+                    (9, 0.18, (0, 215, 255)),
+                    (6, 0.28, (0, 215, 255))]:
+                    overlay = pizarra.copy()
+                    cv2.circle(overlay, (x, y), r, color, -1)
+                    cv2.addWeighted(overlay, alpha, pizarra, 1 - alpha, 0, pizarra)
+                cv2.circle(pizarra, (x, y), 6, (255, 255, 100), -1)
+                cv2.circle(pizarra, (x, y), 3, (255,255,255), -1)
+            ultimo_punto_dibujo = (x, y)
+            # --- Chispas doradas tipo espadas ---
+            idx = 8  # Punta del índice
+            px_vis = int(hand_landmarks[idx].x * WIDTH)
+            py_vis = int(hand_landmarks[idx].y * HEIGHT)
+            for _ in range(random.randint(3, 7)):
+                chispas.append(Chispa(px_vis, py_vis))
+    else:
+        ultimo_punto_dibujo = None
+        # Limpiar suavizado para evitar líneas entre trazos
+        suavizado_ix.clear()
+        suavizado_iy.clear()
+        # El brillo solo dura 0.5 segundos tras dejar de dibujar
+        if brillo_activo and (time.time() - brillo_time > 0.5):
+            brillo_activo = False
+            brillo_pos = None
+
+
+    # Mostrar la pizarra con zoom y pan
+    vis = cv2.resize(pizarra, (0, 0), fx=zoom, fy=zoom, interpolation=cv2.INTER_NEAREST)
+    h_vis, w_vis, _ = vis.shape
+    # Crear fondo negro del tamaño de la ventana
+    fondo = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
+    # Calcular región de interés
+    x0 = clamp(pan_x, 0, max(0, w_vis - WIDTH))
+    y0 = clamp(pan_y, 0, max(0, h_vis - HEIGHT))
+    x1 = x0 + WIDTH
+    y1 = y0 + HEIGHT
+    # Pegar la región visible de la pizarra grande
+    fondo[:min(h_vis - y0, HEIGHT), :min(w_vis - x0, WIDTH)] = vis[y0:y1, x0:x1]
+
+    # --- Efectos temporales: mini mano y brillo solo en la visualización ---
+    # --- Animación de chispas doradas ---
+    nuevas_chispas = []
+    for chispa in chispas:
+        chispa.step()
+        if chispa.vivo():
+            alpha = chispa.alpha()
+            overlay = fondo.copy()
+            cv2.circle(overlay, (int(chispa.x), int(chispa.y)), chispa.size, chispa.color, -1)
+            cv2.addWeighted(overlay, alpha, fondo, 1 - alpha, 0, fondo)
+            nuevas_chispas.append(chispa)
+    chispas = nuevas_chispas
+    if hand_landmarks is not None:
+        # Dibuja la mano sobre el fondo (visualización), sin círculos celestes grandes
+        fondo = detector.dibujar_mano(fondo, hand_landmarks)
+
+    # Dedo índice: efecto glow dorado con centro blanco y borde neón
+    if mira_punto is not None:
+        x_mira = int((mira_punto[0] * zoom) - pan_x)
+        y_mira = int((mira_punto[1] * zoom) - pan_y)
+        if 0 <= x_mira < WIDTH and 0 <= y_mira < HEIGHT:
+            # Glow dorado (círculos concéntricos)
+            for r, alpha in [(28, 0.10), (18, 0.18), (12, 0.28)]:
+                overlay = fondo.copy()
+                cv2.circle(overlay, (x_mira, y_mira), r, (0, 215, 255), -1)  # Dorado
+                cv2.addWeighted(overlay, alpha, fondo, 1 - alpha, 0, fondo)
+            # Borde neón (celeste)
+            cv2.circle(fondo, (x_mira, y_mira), 10, (255, 255, 100), 2)
+            # Centro blanco brillante
+            cv2.circle(fondo, (x_mira, y_mira), 6, (255, 255, 255), -1)
+
+    cv2.imshow('Pizarra mágica', fondo)
+    # Mostrar la mano
+    cv2.imshow('Mano', frame)
+    if cv2.waitKey(1) & 0xFF == 27:
+        break
+
+cap.release()
+cv2.destroyAllWindows()
